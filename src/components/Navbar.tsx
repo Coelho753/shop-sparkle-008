@@ -63,7 +63,7 @@ export function Navbar() {
             {user && (
               <div className="hidden sm:flex items-center gap-2 ml-1">
                 <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground">
-                  {user.name.charAt(0)}
+                  {(user.name || user.email || 'U').charAt(0).toUpperCase()}
                 </div>
               </div>
             )}
