@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MainLayout } from "@/components/MainLayout";
 import Index from "./pages/Index";
 import ProductsPage from "./pages/ProductsPage";
@@ -25,7 +26,16 @@ const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm text-muted-foreground">Carregando...</span>
+        </div>
+      </div>
+    );
+  }
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
@@ -52,21 +62,23 @@ const AppRoutes = () => (
 
 const App = () => {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <CartProvider>
-          <ThemeProvider attribute="class" defaultTheme="dark" storageKey="dsg-theme">
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <AppRoutes />
-              </BrowserRouter>
-            </TooltipProvider>
-          </ThemeProvider>
-        </CartProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <CartProvider>
+            <ThemeProvider attribute="class" defaultTheme="dark" storageKey="dsg-theme">
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
+                  <AppRoutes />
+                </BrowserRouter>
+              </TooltipProvider>
+            </ThemeProvider>
+          </CartProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 };
 
