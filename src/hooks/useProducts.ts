@@ -181,14 +181,20 @@ interface ApiPromotion {
   discountValue?: number;
   discount?: number;
   active?: boolean;
+  endDate?: string;
+  dataFim?: string;
 }
 
 function applyPromotions(products: Product[], promotions: ApiPromotion[]): Product[] {
   if (!promotions.length) return products;
 
+  const now = new Date();
   const promoMap = new Map<string, ApiPromotion>();
   promotions.forEach(p => {
     if (!p.active && p.active !== undefined) return;
+    // Skip expired promotions
+    const endDate = p.endDate || p.dataFim;
+    if (endDate && new Date(endDate) < now) return;
     const pid = typeof p.productId === 'object' ? p.productId._id : (typeof p.product === 'object' ? (p.product as any)._id : (p.productId || p.product || ''));
     if (pid) promoMap.set(pid, p);
   });

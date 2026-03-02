@@ -170,67 +170,113 @@ export default function PromotionsPage() {
             <Loader2 className="w-4 h-4 animate-spin" />
             <span className="text-sm">Carregando...</span>
           </div>
-        ) : promotions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhuma promoção cadastrada.</p>
-        ) : (
-          <div className="space-y-3">
-            {promotions.map((promo) => {
-              const info = getProductInfo(promo);
-              return (
-                <div key={promo._id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary border border-border">
-                  {info.image ? (
-                    <img src={info.image} alt={info.name} className="w-12 h-12 rounded-md object-cover border border-border flex-shrink-0" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-                      <Tag className="w-5 h-5 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {info.name}
-                      {(() => {
-                        const d = getPromoDiscount(promo);
-                        return info.price > 0 && d.value > 0 ? (
-                          <span className="ml-2 text-xs font-medium text-primary">
-                            → R$ {Math.max(0, d.type === 'percentage' ? info.price * (1 - d.value / 100) : info.price - d.value).toFixed(2).replace('.', ',')}
-                          </span>
-                        ) : null;
-                      })()}
-                    </p>
-                    {info.id && <p className="text-[10px] text-muted-foreground font-mono truncate">ID: {info.id}</p>}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant={promo.active ? 'default' : 'secondary'}>
-                        {promo.active ? 'Ativa' : 'Inativa'}
-                      </Badge>
-                      {(() => {
-                        const d = getPromoDiscount(promo);
-                        return (
-                          <span className="text-xs text-muted-foreground">
-                            {d.type === 'percentage' ? `${d.value}%` : `R$ ${d.value.toFixed(2).replace('.', ',')}`} de desconto
-                          </span>
-                        );
-                      })()}
-                      {info.price > 0 && (
-                        <span className="text-xs text-primary font-medium">
-                          Preço original: R$ {info.price.toFixed(2).replace('.', ',')}
-                        </span>
-                      )}
-                    </div>
-                    {(promo.startDate || promo.endDate) && (
-                      <p className="text-xs text-muted-foreground">
-                    {promo.startDate && `De ${new Date(promo.startDate).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`}
-                        {promo.endDate && ` até ${new Date(promo.endDate).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`}
-                      </p>
-                    )}
-                  </div>
-                  <Button variant="ghost" size="icon" className="flex-shrink-0" onClick={() => handleDeletePromo(promo._id)}>
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
+        ) : (() => {
+          const now = new Date();
+          const activePromotions = promotions.filter((promo) => {
+            // Remove promoções expiradas (endDate no passado)
+            if (promo.endDate && new Date(promo.endDate) < now) return false;
+            return true;
+          });
+          const expiredPromotions = promotions.filter((promo) => {
+            return promo.endDate && new Date(promo.endDate) < now;
+          });
+
+          return activePromotions.length === 0 && expiredPromotions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma promoção cadastrada.</p>
+          ) : (
+            <div className="space-y-4">
+              {activePromotions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma promoção ativa no momento.</p>
+              ) : (
+                <div className="space-y-3">
+                  {activePromotions.map((promo) => {
+                    const info = getProductInfo(promo);
+                    return (
+                      <div key={promo._id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary border border-border">
+                        {info.image ? (
+                          <img src={info.image} alt={info.name} className="w-12 h-12 rounded-md object-cover border border-border flex-shrink-0" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+                            <Tag className="w-5 h-5 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {info.name}
+                            {(() => {
+                              const d = getPromoDiscount(promo);
+                              return info.price > 0 && d.value > 0 ? (
+                                <span className="ml-2 text-xs font-medium text-primary">
+                                  → R$ {Math.max(0, d.type === 'percentage' ? info.price * (1 - d.value / 100) : info.price - d.value).toFixed(2).replace('.', ',')}
+                                </span>
+                              ) : null;
+                            })()}
+                          </p>
+                          {info.id && <p className="text-[10px] text-muted-foreground font-mono truncate">ID: {info.id}</p>}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant={promo.active ? 'default' : 'secondary'}>
+                              {promo.active ? 'Ativa' : 'Inativa'}
+                            </Badge>
+                            {(() => {
+                              const d = getPromoDiscount(promo);
+                              return (
+                                <span className="text-xs text-muted-foreground">
+                                  {d.type === 'percentage' ? `${d.value}%` : `R$ ${d.value.toFixed(2).replace('.', ',')}`} de desconto
+                                </span>
+                              );
+                            })()}
+                            {info.price > 0 && (
+                              <span className="text-xs text-primary font-medium">
+                                Preço original: R$ {info.price.toFixed(2).replace('.', ',')}
+                              </span>
+                            )}
+                          </div>
+                          {(promo.startDate || promo.endDate) && (
+                            <p className="text-xs text-muted-foreground">
+                              {promo.startDate && `De ${new Date(promo.startDate).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`}
+                              {promo.endDate && ` até ${new Date(promo.endDate).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`}
+                            </p>
+                          )}
+                        </div>
+                        <Button variant="ghost" size="icon" className="flex-shrink-0" onClick={() => handleDeletePromo(promo._id)}>
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
-        )}
+              )}
+
+              {expiredPromotions.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-muted-foreground">Promoções Expiradas ({expiredPromotions.length})</h3>
+                  <div className="space-y-2 opacity-60">
+                    {expiredPromotions.map((promo) => {
+                      const info = getProductInfo(promo);
+                      const d = getPromoDiscount(promo);
+                      return (
+                        <div key={promo._id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 border border-border">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-muted-foreground truncate">
+                              {info.name} — {d.type === 'percentage' ? `${d.value}%` : `R$ ${d.value.toFixed(2).replace('.', ',')}`}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                              Expirou em {new Date(promo.endDate!).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                            </p>
+                          </div>
+                          <Badge variant="secondary" className="text-[10px]">Expirada</Badge>
+                          <Button variant="ghost" size="icon" className="flex-shrink-0 h-8 w-8" onClick={() => handleDeletePromo(promo._id)}>
+                            <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Formulário de criação */}
