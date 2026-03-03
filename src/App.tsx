@@ -44,7 +44,7 @@ const AppRoutes = () => (
   <Routes>
     <Route path="/login" element={<LoginPage />} />
     <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-      <Route path="/" element={<Index />} />
+      <Route path="/home" element={<Index />} />
       <Route path="/products/:id" element={<ProductDetailPage />} />
       <Route path="/products" element={<ProductsPage />} />
       <Route path="/cart" element={<CartPage />} />
@@ -56,6 +56,7 @@ const AppRoutes = () => (
       <Route path="/admin/promotions" element={<PromotionsPage />} />
       <Route path="/admin/categories" element={<CategoriesPage />} />
     </Route>
+    <Route path="/" element={<Navigate to="/login" replace />} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );

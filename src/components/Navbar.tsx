@@ -27,7 +27,7 @@ export function Navbar() {
         <div className="flex items-center gap-3 px-4 md:px-6 h-14">
           {/* Logo - acts as menu button on mobile */}
           <button
-            onClick={() => { if (window.innerWidth < 768) setMobileOpen(true); else navigate('/'); }}
+            onClick={() => { if (window.innerWidth < 768) setMobileOpen(true); else navigate('/home'); }}
             className="flex items-center gap-2 shrink-0 p-1 rounded-full hover:ring-2 hover:ring-primary/50 transition-all"
           >
             <img src={dsgLogo} alt="DSG Tech" className="w-8 h-8 rounded-full" />
