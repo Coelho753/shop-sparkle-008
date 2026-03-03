@@ -3,7 +3,7 @@ import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
 
 const userLinks = [
-  { to: '/', label: 'Home', icon: Home },
+  { to: '/home', label: 'Home', icon: Home },
   { to: '/products', label: 'Produtos', icon: ShoppingBag },
   { to: '/my-orders', label: 'Minhas Compras', icon: Package },
   { to: '/settings', label: 'Configurações', icon: Settings },
@@ -37,7 +37,7 @@ export function AppSidebar() {
           <NavLink
             key={link.to}
             to={link.to}
-            end={link.to === '/'}
+            end={link.to === '/home'}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             activeClassName="bg-sidebar-accent text-sidebar-primary font-semibold"
           >

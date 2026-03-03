@@ -27,7 +27,7 @@ export default function LoginPage() {
         await register(name, email, password);
       }
       toast({ title: '✅ Sucesso!', description: isLogin ? 'Login realizado!' : 'Conta criada!' });
-      navigate('/');
+      navigate('/home');
     } catch (err: any) {
       toast({ title: '❌ Erro', description: err.message || 'Falha na autenticação', variant: 'destructive' });
     } finally {
