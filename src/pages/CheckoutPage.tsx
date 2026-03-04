@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import api from '@/services/api';
+import { useLocalOrders } from '@/hooks/useLocalOrders';
 import {
   ArrowLeft,
   ShieldCheck,
@@ -34,6 +35,7 @@ export default function CheckoutPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { addOrder } = useLocalOrders();
 
   const [loading, setLoading] = useState(false);
   const [mpReady, setMpReady] = useState(false);
@@ -52,6 +54,22 @@ export default function CheckoutPage() {
 
   const shippingCost = parseFloat(sessionStorage.getItem('dsg-shipping-cost') || '0');
   const total = totalPrice + shippingCost;
+
+  const saveOrderLocally = (paymentMethod: 'pix' | 'card') => {
+    addOrder({
+      items: items.map(i => ({
+        productId: i.product.id,
+        productName: i.product.name,
+        productImage: i.product.images[0] || '',
+        quantity: i.quantity,
+        unitPrice: i.product.price,
+      })),
+      total,
+      shippingCost,
+      paymentMethod,
+      createdAt: new Date().toISOString(),
+    });
+  };
 
   // Load Mercado Pago SDK
   useEffect(() => {
@@ -93,6 +111,7 @@ export default function CheckoutPage() {
           qr_code: res.qr_code || res.point_of_interaction?.transaction_data?.qr_code,
           ticket_url: res.ticket_url,
         });
+        saveOrderLocally('pix');
         toast({ title: 'PIX gerado!', description: 'Escaneie o QR code ou copie o código para pagar.' });
       } else if (res.init_point || res.sandbox_init_point) {
         // Fallback to redirect
@@ -136,11 +155,13 @@ export default function CheckoutPage() {
       });
 
       if (res.status === 'approved') {
+        saveOrderLocally('card');
         clearCart();
         sessionStorage.removeItem('dsg-shipping-cost');
         toast({ title: 'Pagamento aprovado! ✅', description: 'Seu pedido foi confirmado.' });
         navigate('/my-orders');
       } else if (res.status === 'in_process' || res.status === 'pending') {
+        saveOrderLocally('card');
         toast({ title: 'Pagamento em análise', description: 'Seu pagamento está sendo processado.' });
         navigate('/my-orders');
       } else {
