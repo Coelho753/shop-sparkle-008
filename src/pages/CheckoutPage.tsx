@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import api from '@/services/api';
 import { useLocalOrders } from '@/hooks/useLocalOrders';
+import { useCreateOrder } from '@/hooks/useOrders';
 import {
   ArrowLeft,
   ShieldCheck,
@@ -36,6 +37,7 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { addOrder } = useLocalOrders();
+  const createOrder = useCreateOrder();
 
   const [loading, setLoading] = useState(false);
   const [mpReady, setMpReady] = useState(false);
@@ -56,6 +58,7 @@ export default function CheckoutPage() {
   const total = totalPrice + shippingCost;
 
   const saveOrderLocally = (paymentMethod: 'pix' | 'card') => {
+    // Save locally for immediate display
     addOrder({
       items: items.map(i => ({
         productId: i.product.id,
@@ -68,6 +71,14 @@ export default function CheckoutPage() {
       shippingCost,
       paymentMethod,
       createdAt: new Date().toISOString(),
+    });
+
+    // Also create on backend
+    createOrder.mutate({
+      items: items.map(i => ({
+        productId: i.product.id,
+        quantity: i.quantity,
+      })),
     });
   };
 

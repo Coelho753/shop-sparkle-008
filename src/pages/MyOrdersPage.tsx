@@ -1,57 +1,84 @@
 import { useState } from 'react';
 import { Package, Loader2, ChevronRight, Truck, CheckCircle2, Clock, Box, MapPin, ShoppingBag } from 'lucide-react';
-import { useOrders } from '@/hooks/useOrders';
+import { useOrders, Order } from '@/hooks/useOrders';
 import { useLocalOrders, LocalOrder } from '@/hooks/useLocalOrders';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
+const BASE_URL = 'https://dsg-b.onrender.com';
+
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Package }> = {
+  pending: { label: 'Pendente', color: 'text-yellow-500 bg-yellow-500/10', icon: Clock },
   confirmed: { label: 'Confirmado', color: 'text-blue-500 bg-blue-500/10', icon: CheckCircle2 },
   processing: { label: 'Em preparação', color: 'text-amber-500 bg-amber-500/10', icon: Box },
   shipped: { label: 'Enviado', color: 'text-purple-500 bg-purple-500/10', icon: Truck },
   out_for_delivery: { label: 'Saiu para entrega', color: 'text-orange-500 bg-orange-500/10', icon: MapPin },
   delivered: { label: 'Entregue', color: 'text-green-500 bg-green-500/10', icon: CheckCircle2 },
-  pending: { label: 'Pendente', color: 'text-yellow-500 bg-yellow-500/10', icon: Clock },
   completed: { label: 'Concluído', color: 'text-green-500 bg-green-500/10', icon: CheckCircle2 },
+  cancelled: { label: 'Cancelado', color: 'text-red-500 bg-red-500/10', icon: Clock },
 };
 
-function OrderTrackingTimeline({ updates }: { updates: LocalOrder['trackingUpdates'] }) {
-  return (
-    <div className="space-y-0">
-      {updates.map((step, i) => {
-        const isLast = i === updates.length - 1;
-        return (
-          <div key={step.status} className="flex gap-3">
-            <div className="flex flex-col items-center">
-              <div className={`w-3 h-3 rounded-full border-2 mt-1 ${
-                step.completed 
-                  ? 'bg-primary border-primary' 
-                  : 'bg-background border-muted-foreground/30'
-              }`} />
-              {!isLast && (
-                <div className={`w-0.5 flex-1 min-h-[28px] ${
-                  step.completed ? 'bg-primary' : 'bg-muted-foreground/20'
-                }`} />
-              )}
-            </div>
-            <div className="pb-4">
-              <p className={`text-sm font-medium ${step.completed ? 'text-foreground' : 'text-muted-foreground'}`}>
-                {step.label}
-              </p>
-              {step.completed && step.date && (
-                <p className="text-xs text-muted-foreground">
-                  {new Date(step.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                </p>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+function resolveImage(img?: string) {
+  if (!img) return 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop';
+  return img.startsWith('http') ? img : `${BASE_URL}${img}`;
 }
 
-function OrderCard({ order, onSelect }: { order: LocalOrder; onSelect: () => void }) {
+// Unified order type for display
+interface DisplayOrder {
+  id: string;
+  items: { name: string; image: string; quantity: number; unitPrice: number }[];
+  subtotal: number;
+  shipping: number;
+  total: number;
+  status: string;
+  shippingCompany?: string;
+  shippingEstimatedDays?: number;
+  createdAt: string;
+  source: 'api' | 'local';
+}
+
+function apiOrderToDisplay(o: Order): DisplayOrder {
+  return {
+    id: o.id,
+    items: o.items.map(item => {
+      const productObj = typeof item.product === 'object' ? item.product : null;
+      return {
+        name: item.name || productObj?.name || 'Produto',
+        image: resolveImage(productObj?.image),
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      };
+    }),
+    subtotal: o.subtotal,
+    shipping: o.shipping,
+    total: o.total,
+    status: o.status,
+    shippingCompany: o.shippingCompany,
+    shippingEstimatedDays: o.shippingEstimatedDays,
+    createdAt: o.createdAt,
+    source: 'api',
+  };
+}
+
+function localOrderToDisplay(o: LocalOrder): DisplayOrder {
+  return {
+    id: o.id,
+    items: o.items.map(item => ({
+      name: item.productName,
+      image: resolveImage(item.productImage),
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+    })),
+    subtotal: o.total - o.shippingCost,
+    shipping: o.shippingCost,
+    total: o.total,
+    status: o.status,
+    createdAt: o.createdAt,
+    source: 'local',
+  };
+}
+
+function OrderCard({ order, onSelect }: { order: DisplayOrder; onSelect: () => void }) {
   const config = statusConfig[order.status] || statusConfig.pending;
   const StatusIcon = config.icon;
 
@@ -62,7 +89,7 @@ function OrderCard({ order, onSelect }: { order: LocalOrder; onSelect: () => voi
     >
       <div className="flex items-start justify-between mb-3">
         <div>
-          <p className="text-xs text-muted-foreground font-mono">{order.id}</p>
+          <p className="text-xs text-muted-foreground font-mono">{order.id.slice(0, 20)}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
             {new Date(order.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
           </p>
@@ -77,13 +104,13 @@ function OrderCard({ order, onSelect }: { order: LocalOrder; onSelect: () => voi
         {order.items.map((item, i) => (
           <div key={i} className="flex items-center gap-3">
             <img
-              src={item.productImage}
-              alt={item.productName}
+              src={item.image}
+              alt={item.name}
               className="w-12 h-12 rounded-lg object-cover bg-secondary flex-shrink-0"
               onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop'; }}
             />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-card-foreground truncate">{item.productName}</p>
+              <p className="text-sm font-medium text-card-foreground truncate">{item.name}</p>
               <p className="text-xs text-muted-foreground">{item.quantity}x R$ {item.unitPrice.toFixed(2).replace('.', ',')}</p>
             </div>
           </div>
@@ -98,8 +125,19 @@ function OrderCard({ order, onSelect }: { order: LocalOrder; onSelect: () => voi
   );
 }
 
-function OrderDetail({ order, onBack }: { order: LocalOrder; onBack: () => void }) {
+function OrderDetail({ order, onBack }: { order: DisplayOrder; onBack: () => void }) {
   const config = statusConfig[order.status] || statusConfig.pending;
+
+  const trackingSteps = [
+    { status: 'pending', label: 'Pedido recebido' },
+    { status: 'processing', label: 'Em preparação' },
+    { status: 'shipped', label: 'Enviado' },
+    { status: 'out_for_delivery', label: 'Saiu para entrega' },
+    { status: 'delivered', label: 'Entregue' },
+  ];
+
+  const statusOrder = ['pending', 'processing', 'shipped', 'out_for_delivery', 'delivered'];
+  const currentIndex = statusOrder.indexOf(order.status);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -109,7 +147,8 @@ function OrderDetail({ order, onBack }: { order: LocalOrder; onBack: () => void 
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-display font-bold text-foreground">Pedido {order.id}</h2>
+          <h2 className="text-xl font-display font-bold text-foreground">Pedido</h2>
+          <p className="text-xs text-muted-foreground font-mono">{order.id}</p>
           <p className="text-sm text-muted-foreground">
             {new Date(order.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
           </p>
@@ -125,14 +164,43 @@ function OrderDetail({ order, onBack }: { order: LocalOrder; onBack: () => void 
           <Truck className="w-5 h-5 text-primary" />
           <h3 className="font-display font-semibold text-foreground">Acompanhamento</h3>
         </div>
-        <OrderTrackingTimeline updates={order.trackingUpdates} />
-        <div className="mt-2 pt-3 border-t border-border">
-          <p className="text-xs text-muted-foreground">
-            Previsão de entrega: <span className="font-medium text-foreground">
-              {new Date(order.estimatedDelivery).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
-            </span>
-          </p>
+        <div className="space-y-0">
+          {trackingSteps.map((step, i) => {
+            const isCompleted = i <= currentIndex;
+            const isLast = i === trackingSteps.length - 1;
+            return (
+              <div key={step.status} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <div className={`w-3 h-3 rounded-full border-2 mt-1 ${
+                    isCompleted ? 'bg-primary border-primary' : 'bg-background border-muted-foreground/30'
+                  }`} />
+                  {!isLast && (
+                    <div className={`w-0.5 flex-1 min-h-[28px] ${
+                      isCompleted && i < currentIndex ? 'bg-primary' : 'bg-muted-foreground/20'
+                    }`} />
+                  )}
+                </div>
+                <div className="pb-4">
+                  <p className={`text-sm font-medium ${isCompleted ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    {step.label}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
         </div>
+        {order.shippingCompany && (
+          <div className="mt-2 pt-3 border-t border-border">
+            <p className="text-xs text-muted-foreground">
+              Transportadora: <span className="font-medium text-foreground">{order.shippingCompany}</span>
+            </p>
+            {order.shippingEstimatedDays && (
+              <p className="text-xs text-muted-foreground">
+                Prazo estimado: <span className="font-medium text-foreground">{order.shippingEstimatedDays} dias úteis</span>
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Items */}
@@ -142,13 +210,13 @@ function OrderDetail({ order, onBack }: { order: LocalOrder; onBack: () => void 
           {order.items.map((item, i) => (
             <div key={i} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
               <img
-                src={item.productImage}
-                alt={item.productName}
+                src={item.image}
+                alt={item.name}
                 className="w-14 h-14 rounded-lg object-cover bg-secondary flex-shrink-0"
                 onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop'; }}
               />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-card-foreground">{item.productName}</p>
+                <p className="text-sm font-medium text-card-foreground">{item.name}</p>
                 <p className="text-xs text-muted-foreground">Qtd: {item.quantity}</p>
               </div>
               <p className="text-sm font-semibold text-foreground">
@@ -159,10 +227,14 @@ function OrderDetail({ order, onBack }: { order: LocalOrder; onBack: () => void 
         </div>
 
         <div className="mt-3 pt-3 border-t border-border space-y-1">
-          {order.shippingCost > 0 && (
+          <div className="flex justify-between text-sm text-muted-foreground">
+            <span>Subtotal</span>
+            <span>R$ {order.subtotal.toFixed(2).replace('.', ',')}</span>
+          </div>
+          {order.shipping > 0 && (
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Frete</span>
-              <span>R$ {order.shippingCost.toFixed(2).replace('.', ',')}</span>
+              <span>R$ {order.shipping.toFixed(2).replace('.', ',')}</span>
             </div>
           )}
           <div className="flex justify-between text-base font-bold">
@@ -170,14 +242,6 @@ function OrderDetail({ order, onBack }: { order: LocalOrder; onBack: () => void 
             <span className="text-primary">R$ {order.total.toFixed(2).replace('.', ',')}</span>
           </div>
         </div>
-      </div>
-
-      {/* Payment method */}
-      <div className="p-5 rounded-xl bg-card border border-border">
-        <h3 className="font-display font-semibold text-foreground mb-2">Pagamento</h3>
-        <p className="text-sm text-muted-foreground">
-          {order.paymentMethod === 'pix' ? '📱 PIX' : '💳 Cartão de crédito'}
-        </p>
       </div>
     </div>
   );
@@ -189,34 +253,13 @@ export default function MyOrdersPage() {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Merge API orders into local format
-  const mergedApiOrders: LocalOrder[] = (apiOrders || []).map(o => ({
-    id: o.id,
-    items: [{
-      productId: o.productId,
-      productName: o.productName,
-      productImage: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop',
-      quantity: o.quantity,
-      unitPrice: o.total / (o.quantity || 1),
-    }],
-    total: o.total,
-    shippingCost: 0,
-    paymentMethod: 'pix' as const,
-    status: (o.status === 'completed' ? 'delivered' : o.status === 'pending' ? 'confirmed' : 'processing') as LocalOrder['status'],
-    createdAt: o.createdAt,
-    estimatedDelivery: new Date(new Date(o.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    trackingUpdates: [
-      { status: 'confirmed', label: 'Pedido confirmado', date: o.createdAt, completed: true },
-      { status: 'processing', label: 'Em preparação', date: '', completed: o.status !== 'pending' },
-      { status: 'shipped', label: 'Enviado', date: '', completed: o.status === 'completed' },
-      { status: 'out_for_delivery', label: 'Saiu para entrega', date: '', completed: o.status === 'completed' },
-      { status: 'delivered', label: 'Entregue', date: '', completed: o.status === 'completed' },
-    ],
-  }));
+  // Convert both sources to DisplayOrder
+  const apiDisplay = (apiOrders || []).map(apiOrderToDisplay);
+  const localDisplay = localOrders.map(localOrderToDisplay);
 
-  // Combine, avoiding duplicates by id
-  const existingIds = new Set(localOrders.map(o => o.id));
-  const allOrders = [...localOrders, ...mergedApiOrders.filter(o => !existingIds.has(o.id))];
+  // Combine, API takes priority (avoid duplicates)
+  const apiIds = new Set(apiDisplay.map(o => o.id));
+  const allOrders = [...apiDisplay, ...localDisplay.filter(o => !apiIds.has(o.id))];
 
   const selectedOrder = allOrders.find(o => o.id === selectedOrderId);
 

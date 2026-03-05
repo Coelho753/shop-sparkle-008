@@ -26,7 +26,7 @@ const Index = () => {
 
   const handleBuy = (product: Product) => {
     createOrder.mutate(
-      { productId: product.id },
+      { items: [{ productId: product.id, quantity: 1 }] },
       {
         onSuccess: () => {
           toast({ title: '🛒 Pedido criado!', description: `${product.name} - Redirecionando para o WhatsApp...` });

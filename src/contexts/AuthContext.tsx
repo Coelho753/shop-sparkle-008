@@ -3,12 +3,32 @@ import api from '@/services/api';
 
 export type UserRole = 'user' | 'admin' | 'distributor' | 'reseller';
 
+export interface UserAddress {
+  street: string;
+  number: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  complement?: string;
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
   avatar?: string;
+  cpf?: string;
+  address?: UserAddress;
+}
+
+interface RegisterData {
+  name: string;
+  email: string;
+  password: string;
+  cpf: string;
+  address: UserAddress;
 }
 
 interface AuthContextType {
@@ -16,7 +36,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   hasRole: (roles: UserRole[]) => boolean;
 }
@@ -25,7 +45,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
-    // Initialize from localStorage immediately to avoid black screen flash
     try {
       const saved = localStorage.getItem('auth_user');
       return saved ? JSON.parse(saved) : null;
@@ -40,15 +59,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await api.get<any>('/api/users/me');
       const mapped: User = {
         id: data._id || data.id,
-        name: data.nome || data.name || data.email,
-        email: data.email,
+        name: data.nome || data.name || data.email || '',
+        email: data.email || '',
         role: data.role || 'user',
         avatar: data.avatar,
+        cpf: data.cpf,
+        address: data.address,
       };
       localStorage.setItem('auth_user', JSON.stringify(mapped));
       setUser(mapped);
     } catch {
-      // Token inválido, manter dados locais
       const savedUser = localStorage.getItem('auth_user');
       if (savedUser) {
         try { setUser(JSON.parse(savedUser)); } catch { /* ignore */ }
@@ -75,22 +95,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: data.user.email,
       role: data.user.role || 'user',
       avatar: data.user.avatar,
+      cpf: data.user.cpf,
+      address: data.user.address,
     };
     localStorage.setItem('auth_token', token);
     localStorage.setItem('auth_user', JSON.stringify(mapped));
     setUser(mapped);
   };
 
-  const register = async (name: string, email: string, password: string) => {
-    const data = await api.post<{ accessToken: string; refreshToken?: string; token?: string; user: any }>('/api/auth/register', { name, email, password });
+  const register = async (regData: RegisterData) => {
+    const data = await api.post<{ accessToken: string; refreshToken?: string; token?: string; user: any }>('/api/auth/register', {
+      name: regData.name,
+      email: regData.email,
+      password: regData.password,
+      cpf: regData.cpf,
+      address: regData.address,
+    });
     const token = data.accessToken || data.token;
     if (token) {
       const mapped: User = {
         id: data.user._id || data.user.id,
-        name: data.user.nome || data.user.name || name,
-        email: data.user.email || email,
+        name: data.user.nome || data.user.name || regData.name,
+        email: data.user.email || regData.email,
         role: data.user.role || 'user',
         avatar: data.user.avatar,
+        cpf: data.user.cpf || regData.cpf,
+        address: data.user.address || regData.address,
       };
       localStorage.setItem('auth_token', token);
       localStorage.setItem('auth_user', JSON.stringify(mapped));

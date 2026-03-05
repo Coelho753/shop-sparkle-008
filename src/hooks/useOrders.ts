@@ -1,13 +1,37 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 
+export interface OrderItem {
+  product: {
+    _id: string;
+    name: string;
+    image?: string;
+    price?: number;
+  } | string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+}
+
 export interface Order {
   id: string;
-  productId: string;
-  productName: string;
-  quantity: number;
+  items: OrderItem[];
+  subtotal: number;
+  shipping: number;
   total: number;
   status: string;
+  shippingCompany?: string;
+  shippingEstimatedDays?: number;
+  shippingAddress?: {
+    street: string;
+    number: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    complement?: string;
+  };
   createdAt: string;
 }
 
@@ -15,16 +39,26 @@ export function useOrders() {
   return useQuery({
     queryKey: ['orders'],
     queryFn: async () => {
-      const data = await api.get<any>('/api/pedidos');
-      const list = Array.isArray(data) ? data : data.orders ?? data.pedidos ?? [];
+      const raw = await api.get<any>('/api/orders/my-orders');
+      // Backend wraps in { success, data } via ok() helper
+      const list = Array.isArray(raw) ? raw : raw.data ?? raw.orders ?? [];
       return list.map((o: any): Order => ({
         id: o._id || o.id,
-        productId: o.productId || o.product?._id || o.produto?._id || '',
-        productName: o.productName || o.product?.name || o.produto?.nome || 'Produto',
-        quantity: o.quantity ?? o.quantidade ?? 1,
-        total: o.total ?? o.price ?? o.valor ?? 0,
+        items: (o.items || []).map((item: any) => ({
+          product: item.product,
+          name: item.name || (typeof item.product === 'object' ? item.product.name : ''),
+          quantity: item.quantity ?? 1,
+          unitPrice: item.unitPrice ?? 0,
+          subtotal: item.subtotal ?? 0,
+        })),
+        subtotal: o.subtotal ?? 0,
+        shipping: o.shipping ?? 0,
+        total: o.total ?? 0,
         status: o.status ?? 'pending',
-        createdAt: o.createdAt ?? o.criadoEm ?? new Date().toISOString(),
+        shippingCompany: o.shippingCompany,
+        shippingEstimatedDays: o.shippingEstimatedDays,
+        shippingAddress: o.shippingAddress,
+        createdAt: o.createdAt ?? new Date().toISOString(),
       }));
     },
     retry: 1,
@@ -34,8 +68,8 @@ export function useOrders() {
 export function useCreateOrder() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { productId: string; quantity?: number }) =>
-      api.post('/api/pedidos', body),
+    mutationFn: (body: { items: { productId: string; quantity: number }[] }) =>
+      api.post('/api/orders', body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
