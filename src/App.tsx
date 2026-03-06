@@ -40,6 +40,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function SmartRedirect() {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return null;
+  return <Navigate to={isAuthenticated ? '/home' : '/login'} replace />;
+}
+
 const AppRoutes = () => (
   <Routes>
     <Route path="/login" element={<LoginPage />} />
@@ -56,7 +62,7 @@ const AppRoutes = () => (
       <Route path="/admin/promotions" element={<PromotionsPage />} />
       <Route path="/admin/categories" element={<CategoriesPage />} />
     </Route>
-    <Route path="/" element={<Navigate to="/login" replace />} />
+    <Route path="/" element={<SmartRedirect />} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
