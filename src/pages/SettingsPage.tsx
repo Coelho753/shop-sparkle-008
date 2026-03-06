@@ -33,7 +33,7 @@ export default function SettingsPage() {
     }
     setSaving(true);
     try {
-      await api.put('/api/users/me', { name: name.trim(), email: email.trim() });
+      await api.put('/api/users/me', { name: name.trim(), email: email.trim(), nome: name.trim() });
       // Update local storage
       const savedUser = localStorage.getItem('auth_user');
       if (savedUser) {

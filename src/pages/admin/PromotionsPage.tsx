@@ -74,42 +74,14 @@ export default function PromotionsPage() {
     }
     setLoading(true);
     try {
-      const promoData = {
-        ativa: active,
-        tipoDesconto: discountType,
-        valorDesconto: Number(discountValue),
-        dataInicio: startDate || undefined,
-        dataFim: endDate || undefined,
-      };
-
-      const endpoints = [
-        // 1. POST /api/promotions com campos em PT (formato provável do backend)
-        () => api.post('/api/promotions', { produto: productId, ...promoData }),
-        // 2. POST /api/promotions com campos bilíngues
-        () => api.post('/api/promotions', { productId, produto: productId, discountType, tipoDesconto: discountType, discountValue: Number(discountValue), valorDesconto: Number(discountValue), startDate: startDate || undefined, dataInicio: startDate || undefined, endDate: endDate || undefined, dataFim: endDate || undefined, active, ativa: active }),
-        // 3. POST /api/promocoes
-        () => api.post('/api/promocoes', { produto: productId, ...promoData }),
-        // 4. PATCH no produto diretamente
-        () => api.patch(`/api/products/${productId}`, { promocao: promoData, hasPromo: active }),
-        // 5. PUT no produto
-        () => api.put(`/api/products/${productId}`, { promocao: promoData, hasPromo: active }),
-      ];
-
-      let lastError: any = null;
-      let success = false;
-      for (const tryEndpoint of endpoints) {
-        try {
-          await tryEndpoint();
-          success = true;
-          break;
-        } catch (err: any) {
-          console.warn('[Promoção] Endpoint falhou:', err.message);
-          lastError = err;
-          // Continua para o próximo endpoint em QUALQUER erro (404, 500, etc.)
-          continue;
-        }
-      }
-      if (!success && lastError) throw lastError;
+      await api.post('/api/promotions', {
+        productId,
+        discountType,
+        discountValue: Number(discountValue),
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        active,
+      });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['promotions'] });
       toast({ title: '✅ Promoção criada!' });

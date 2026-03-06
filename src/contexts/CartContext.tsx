@@ -73,17 +73,31 @@ function mapApiCartToItems(apiItems: ApiCartItem[]): CartItem[] {
     });
 }
 
+function getCartKey(userId?: string) {
+  return userId ? `dsg-cart-${userId}` : 'dsg-cart-guest';
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [items, setItems] = useState<CartItem[]>(() => {
     try {
-      const stored = localStorage.getItem('dsg-cart');
+      const stored = localStorage.getItem(getCartKey(user?.id));
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
     }
   });
   const [syncing, setSyncing] = useState(false);
-  const { user } = useAuth();
+
+  // Load cart for current user when user changes
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(getCartKey(user?.id));
+      setItems(stored ? JSON.parse(stored) : []);
+    } catch {
+      setItems([]);
+    }
+  }, [user?.id]);
 
   // Sync from server when user logs in
   useEffect(() => {
@@ -109,8 +123,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   useEffect(() => {
-    localStorage.setItem('dsg-cart', JSON.stringify(items));
-  }, [items]);
+    localStorage.setItem(getCartKey(user?.id), JSON.stringify(items));
+  }, [items, user?.id]);
 
   // Sync to server silently
   const syncToServer = useCallback(async (productId: string, quantity: number) => {

@@ -20,7 +20,7 @@ export default function CategoriesPage() {
     if (!name.trim()) return;
     setSaving(true);
     try {
-      await api.post('/api/categories', { name: name.trim() });
+      await api.post('/api/categories', { name: name.trim(), nome: name.trim() });
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       toast({ title: '✅ Categoria criada!' });
       setName('');
