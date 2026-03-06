@@ -52,6 +52,7 @@ export default function PromotionsPage() {
   const { data: promotions = [], isLoading: loadingPromos } = usePromotions();
 
   const [productId, setProductId] = useState('');
+  const [title, setTitle] = useState('');
   const [discountType, setDiscountType] = useState('percentage');
   const [discountValue, setDiscountValue] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -75,9 +76,10 @@ export default function PromotionsPage() {
     setLoading(true);
     try {
       await api.post('/api/promotions', {
-        productId,
-        discountType,
-        discountValue: Number(discountValue),
+        product: productId,
+        title: title.trim() || `Promoção ${selectedProduct?.name || ''}`,
+        type: discountType,
+        value: Number(discountValue),
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         active,
@@ -85,7 +87,7 @@ export default function PromotionsPage() {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['promotions'] });
       toast({ title: '✅ Promoção criada!' });
-      setProductId(''); setDiscountValue(''); setStartDate(''); setEndDate('');
+      setProductId(''); setTitle(''); setDiscountValue(''); setStartDate(''); setEndDate('');
     } catch (err: any) {
       toast({ title: '❌ Erro', description: err.message, variant: 'destructive' });
     } finally {
@@ -301,6 +303,11 @@ export default function PromotionsPage() {
             </div>
           );
         })()}
+
+        <div className="space-y-2">
+          <Label>Título da Promoção</Label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Promoção relâmpago" />
+        </div>
 
         <div className="space-y-2">
           <Label>Produto *</Label>
