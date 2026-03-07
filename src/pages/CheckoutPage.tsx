@@ -37,7 +37,7 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { addOrder } = useLocalOrders();
-  const createOrder = useCreateOrder();
+  
 
   const [loading, setLoading] = useState(false);
   const [mpReady, setMpReady] = useState(false);
