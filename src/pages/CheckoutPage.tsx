@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import api from '@/services/api';
 import { useLocalOrders } from '@/hooks/useLocalOrders';
-import { useCreateOrder } from '@/hooks/useOrders';
+// Order is created by backend's createPayment - no separate call needed
 import {
   ArrowLeft,
   ShieldCheck,
