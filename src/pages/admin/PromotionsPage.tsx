@@ -700,7 +700,7 @@ function CouponCard({
         <div className="flex items-center gap-2">
           <span className="font-mono font-bold text-sm text-foreground">{coupon.code}</span>
           <button onClick={() => onCopy(coupon.code)} className="text-muted-foreground hover:text-foreground transition-colors">
-            {copiedCode === coupon.code ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+            {copiedCode === coupon.code ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
           </button>
         </div>
 
