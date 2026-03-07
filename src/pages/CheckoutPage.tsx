@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import api from '@/services/api';
 import { useLocalOrders } from '@/hooks/useLocalOrders';
-import { useCreateOrder } from '@/hooks/useOrders';
+// Order is created by backend's createPayment - no separate call needed
 import {
   ArrowLeft,
   ShieldCheck,
@@ -37,7 +37,7 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { addOrder } = useLocalOrders();
-  const createOrder = useCreateOrder();
+  
 
   const [loading, setLoading] = useState(false);
   const [mpReady, setMpReady] = useState(false);
@@ -58,7 +58,7 @@ export default function CheckoutPage() {
   const total = totalPrice + shippingCost;
 
   const saveOrderLocally = (paymentMethod: 'pix' | 'card') => {
-    // Save locally for immediate display
+    // Save locally for immediate display (backend creates the order inside createPayment)
     addOrder({
       items: items.map(i => ({
         productId: i.product.id,
@@ -71,14 +71,6 @@ export default function CheckoutPage() {
       shippingCost,
       paymentMethod,
       createdAt: new Date().toISOString(),
-    });
-
-    // Also create on backend
-    createOrder.mutate({
-      items: items.map(i => ({
-        productId: i.product.id,
-        quantity: i.quantity,
-      })),
     });
   };
 
@@ -108,7 +100,15 @@ export default function CheckoutPage() {
       const res = await api.post<any>('/api/payments/create', {
         amount: total,
         payment_method_id: 'pix',
+        description: `Pedido DSG - ${items.length} item(ns)`,
         email: email || user?.email || '',
+        payer: {
+          email: email || user?.email || '',
+          identification: {
+            type: 'CPF',
+            number: user?.cpf?.replace(/\D/g, '') || '',
+          },
+        },
         items: items.map(i => ({
           title: i.product.name,
           quantity: i.quantity,
@@ -156,8 +156,16 @@ export default function CheckoutPage() {
         amount: total,
         token: cardToken.id,
         payment_method_id: 'visa',
+        description: `Pedido DSG - ${items.length} item(ns)`,
         installments: parseInt(installments),
         email: email || user?.email || '',
+        payer: {
+          email: email || user?.email || '',
+          identification: {
+            type: 'CPF',
+            number: user?.cpf?.replace(/\D/g, '') || '',
+          },
+        },
         items: items.map(i => ({
           title: i.product.name,
           quantity: i.quantity,
