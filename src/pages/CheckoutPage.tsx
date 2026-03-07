@@ -100,7 +100,15 @@ export default function CheckoutPage() {
       const res = await api.post<any>('/api/payments/create', {
         amount: total,
         payment_method_id: 'pix',
+        description: `Pedido DSG - ${items.length} item(ns)`,
         email: email || user?.email || '',
+        payer: {
+          email: email || user?.email || '',
+          identification: {
+            type: 'CPF',
+            number: user?.cpf?.replace(/\D/g, '') || '',
+          },
+        },
         items: items.map(i => ({
           title: i.product.name,
           quantity: i.quantity,
