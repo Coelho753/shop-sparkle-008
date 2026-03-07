@@ -58,7 +58,7 @@ export default function CheckoutPage() {
   const total = totalPrice + shippingCost;
 
   const saveOrderLocally = (paymentMethod: 'pix' | 'card') => {
-    // Save locally for immediate display
+    // Save locally for immediate display (backend creates the order inside createPayment)
     addOrder({
       items: items.map(i => ({
         productId: i.product.id,
@@ -71,14 +71,6 @@ export default function CheckoutPage() {
       shippingCost,
       paymentMethod,
       createdAt: new Date().toISOString(),
-    });
-
-    // Also create on backend
-    createOrder.mutate({
-      items: items.map(i => ({
-        productId: i.product.id,
-        quantity: i.quantity,
-      })),
     });
   };
 
