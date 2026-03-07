@@ -156,8 +156,16 @@ export default function CheckoutPage() {
         amount: total,
         token: cardToken.id,
         payment_method_id: 'visa',
+        description: `Pedido DSG - ${items.length} item(ns)`,
         installments: parseInt(installments),
         email: email || user?.email || '',
+        payer: {
+          email: email || user?.email || '',
+          identification: {
+            type: 'CPF',
+            number: user?.cpf?.replace(/\D/g, '') || '',
+          },
+        },
         items: items.map(i => ({
           title: i.product.name,
           quantity: i.quantity,
