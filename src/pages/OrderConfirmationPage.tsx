@@ -58,14 +58,24 @@ export default function OrderConfirmationPage() {
         code: couponCode.trim().toUpperCase(),
         orderTotal: totalPrice,
       });
-      const discountValue =
-        res.type === 'percentage'
-          ? Math.min((totalPrice * res.value) / 100, res.maxDiscount || Infinity)
-          : Math.min(res.value, totalPrice);
+
+      // Backend may return { discount } directly or { type, value } for calculation
+      let discountValue: number;
+      if (typeof res.discount === 'number' && res.discount > 0) {
+        // Backend already calculated the discount
+        discountValue = Number(res.discount);
+      } else if (res.type === 'percentage' && typeof res.value === 'number') {
+        discountValue = Math.min((totalPrice * res.value) / 100, res.maxDiscount || Infinity);
+      } else if (typeof res.value === 'number') {
+        discountValue = Math.min(res.value, totalPrice);
+      } else {
+        discountValue = 0;
+      }
+
       setAppliedCoupon({
         code: res.code || couponCode.trim().toUpperCase(),
-        type: res.type,
-        value: res.value,
+        type: res.type || 'fixed',
+        value: Number(res.value || discountValue),
         discount: discountValue,
       });
       toast({
