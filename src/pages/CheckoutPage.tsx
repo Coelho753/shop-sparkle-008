@@ -204,6 +204,7 @@ export default function CheckoutPage() {
         amount: total,
         token: cardToken.id,
         payment_method_id: 'visa',
+        couponCode: savedCoupon?.code || undefined,
         description: `Pedido DSG - ${items.length} item(ns)`,
         installments: parseInt(installments),
         email: email || user?.email || '',
@@ -214,6 +215,11 @@ export default function CheckoutPage() {
             number: user?.cpf?.replace(/\D/g, '') || '',
           },
         },
+        items: items.map((i) => ({
+          title: i.product.name,
+          quantity: i.quantity,
+          unit_price: Number(i.product.price),
+        })),
       });
 
       if (res.status === 'approved') {
