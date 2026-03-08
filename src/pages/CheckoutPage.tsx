@@ -194,7 +194,6 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       const orderId = await createOrder();
-      const savedAddress = getSavedAddress();
 
       const mp = (window as any).mpInstance;
       const cardToken = await mp.createCardToken({
