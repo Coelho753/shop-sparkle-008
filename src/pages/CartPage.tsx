@@ -116,9 +116,8 @@ export default function CartPage() {
 
   const handleCheckout = () => {
     if (items.length === 0) return;
-    // Save shipping cost to pass to checkout page
     sessionStorage.setItem('dsg-shipping-cost', String(shippingCost));
-    navigate('/checkout');
+    navigate('/order-confirmation');
   };
 
   if (items.length === 0) {
