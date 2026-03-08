@@ -148,42 +148,22 @@ export default function CheckoutPage() {
       const orderId = await createOrder();
       const savedAddress = getSavedAddress();
 
-      const res = await api.post<any>('/api/payments/create',
-        orderId
-          ? {
-              orderId,
-              payment_method_id: 'pix',
-              email: email || user?.email || '',
-              payer: {
-                email: email || user?.email || '',
-                identification: {
-                  type: 'CPF',
-                  number: user?.cpf?.replace(/\D/g, '') || '',
-                },
-              },
-            }
-          : {
-              amount: total,
-              payment_method_id: 'pix',
-              description: 'Pedido DSG',
-              email: email || user?.email || '',
-              shippingAddress: savedAddress || undefined,
-              couponCode: savedCoupon?.code || undefined,
-              payer: {
-                email: email || user?.email || '',
-                identification: {
-                  type: 'CPF',
-                  number: user?.cpf?.replace(/\D/g, '') || '',
-                },
-              },
-              items: items.map((i) => ({
-                title: i.product.name,
-                quantity: i.quantity,
-                unit_price: i.product.price,
-                currency_id: 'BRL',
-              })),
-            }
-      );
+      if (!orderId) {
+        throw new Error('Não foi possível criar o pedido. Tente novamente em alguns segundos.');
+      }
+
+      const res = await api.post<any>('/api/payments/create', {
+        orderId,
+        payment_method_id: 'pix',
+        email: email || user?.email || '',
+        payer: {
+          email: email || user?.email || '',
+          identification: {
+            type: 'CPF',
+            number: user?.cpf?.replace(/\D/g, '') || '',
+          },
+        },
+      });
 
       if (res.qr_code_base64 || res.qr_code || res.point_of_interaction) {
         saveOrderLocally('pix');
