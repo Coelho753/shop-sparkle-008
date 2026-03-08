@@ -109,6 +109,7 @@ export default function CheckoutPage() {
       const res = await api.post<any>('/api/payments/create', {
         amount: total,
         payment_method_id: 'pix',
+        couponCode: appliedCoupon?.code || undefined,
         description: `Pedido DSG - ${items.length} item(ns)`,
         email: email || user?.email || '',
         payer: {
