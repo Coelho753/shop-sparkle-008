@@ -146,7 +146,6 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       const orderId = await createOrder();
-      const savedAddress = getSavedAddress();
 
       if (!orderId) {
         throw new Error('Não foi possível criar o pedido. Tente novamente em alguns segundos.');
