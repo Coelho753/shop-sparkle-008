@@ -102,19 +102,32 @@ export default function CheckoutPage() {
     }
   };
 
+  // Step 1: Create order in backend, Step 2: Generate payment with orderId
+  const createOrder = async (): Promise<string> => {
+    const savedAddress = getSavedAddress();
+    const orderRes = await api.post<any>('/api/checkout/create-order', {
+      items: items.map((i) => ({
+        productId: i.product.id,
+        quantity: i.quantity,
+      })),
+      shippingAddress: savedAddress || undefined,
+      couponCode: savedCoupon?.code || undefined,
+    });
+    const orderId = orderRes?.data?._id || orderRes?._id || orderRes?.id;
+    if (!orderId) throw new Error('Pedido criado mas ID não retornado pelo servidor.');
+    return orderId;
+  };
+
   const handlePayPix = async () => {
     if (items.length === 0) return;
     setLoading(true);
     try {
-      const savedAddress = getSavedAddress();
+      const orderId = await createOrder();
 
       const res = await api.post<any>('/api/payments/create', {
-        amount: total,
+        orderId,
         payment_method_id: 'pix',
-        couponCode: savedCoupon?.code || undefined,
-        description: `Pedido DSG - ${items.length} item(ns)`,
         email: email || user?.email || '',
-        shippingAddress: savedAddress || undefined,
         payer: {
           email: email || user?.email || '',
           identification: {
@@ -122,17 +135,10 @@ export default function CheckoutPage() {
             number: user?.cpf?.replace(/\D/g, '') || '',
           },
         },
-        items: items.map((i) => ({
-          productId: i.product.id,
-          title: i.product.name,
-          quantity: i.quantity,
-          unit_price: Number(i.product.price),
-        })),
       });
 
-      if (res.qr_code_base64 || res.qr_code) {
+      if (res.qr_code_base64 || res.qr_code || res.point_of_interaction) {
         saveOrderLocally('pix');
-        // Navigate to PIX page with data
         navigate('/pix-payment', {
           state: {
             qr_code_base64:
@@ -142,6 +148,7 @@ export default function CheckoutPage() {
           },
         });
       } else if (res.init_point || res.sandbox_init_point) {
+        saveOrderLocally('pix');
         clearCart();
         window.location.href = res.init_point || res.sandbox_init_point;
       } else {
@@ -159,6 +166,8 @@ export default function CheckoutPage() {
     if (items.length === 0 || !mpReady) return;
     setLoading(true);
     try {
+      const orderId = await createOrder();
+
       const mp = (window as any).mpInstance;
       const cardToken = await mp.createCardToken({
         cardNumber: cardNumber.replace(/\s/g, ''),
@@ -168,17 +177,12 @@ export default function CheckoutPage() {
         securityCode: cvv,
       });
 
-      const savedAddress = getSavedAddress();
-
       const res = await api.post<any>('/api/payments/create', {
-        amount: total,
+        orderId,
         token: cardToken.id,
         payment_method_id: 'visa',
-        couponCode: savedCoupon?.code || undefined,
-        description: `Pedido DSG - ${items.length} item(ns)`,
         installments: parseInt(installments),
         email: email || user?.email || '',
-        shippingAddress: savedAddress || undefined,
         payer: {
           email: email || user?.email || '',
           identification: {
@@ -186,12 +190,6 @@ export default function CheckoutPage() {
             number: user?.cpf?.replace(/\D/g, '') || '',
           },
         },
-        items: items.map((i) => ({
-          productId: i.product.id,
-          title: i.product.name,
-          quantity: i.quantity,
-          unit_price: Number(i.product.price),
-        })),
       });
 
       if (res.status === 'approved') {
