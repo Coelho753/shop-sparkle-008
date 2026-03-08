@@ -178,11 +178,15 @@ export default function CheckoutPage() {
         securityCode: cvv,
       });
 
+      // Step 1: Create order
+      const orderId = await createOrder();
+
+      // Step 2: Create payment with orderId
       const res = await api.post<any>('/api/payments/create', {
+        orderId,
         amount: total,
         token: cardToken.id,
         payment_method_id: 'visa',
-        couponCode: savedCoupon?.code || undefined,
         description: `Pedido DSG - ${items.length} item(ns)`,
         installments: parseInt(installments),
         email: email || user?.email || '',
@@ -193,11 +197,6 @@ export default function CheckoutPage() {
             number: user?.cpf?.replace(/\D/g, '') || '',
           },
         },
-        items: items.map((i) => ({
-          title: i.product.name,
-          quantity: i.quantity,
-          unit_price: Number(i.product.price),
-        })),
       });
 
       if (res.status === 'approved') {
