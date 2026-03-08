@@ -4,41 +4,67 @@ interface RequestOptions extends RequestInit {
   params?: Record<string, string>;
 }
 
+const POST_404_FALLBACKS: Record<string, string[]> = {
+  '/api/checkout/create-order': ['/api/checkout/createOrder', '/api/orders'],
+};
+
+function getEndpointCandidates(endpoint: string, method?: string) {
+  if (method?.toUpperCase() !== 'POST') return [endpoint];
+  return [endpoint, ...(POST_404_FALLBACKS[endpoint] || [])];
+}
+
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const { params, headers, ...rest } = options;
-
-  let url = `${BASE_URL}${endpoint}`;
-  if (params) {
-    const searchParams = new URLSearchParams(params);
-    url += `?${searchParams.toString()}`;
-  }
 
   const token = localStorage.getItem('auth_token');
   const validToken = token && token !== 'undefined' && token !== 'null' ? token : null;
 
-  // Add timeout - Render free tier can take up to 60s to wake up
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const candidates = getEndpointCandidates(endpoint, rest.method);
+  let response: Response | null = null;
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      ...rest,
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(validToken ? { Authorization: `Bearer ${validToken}` } : {}),
-        ...headers,
-      },
-    });
-  } catch (err: any) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
-      throw new Error('O servidor demorou para responder. O backend pode estar iniciando — tente novamente em alguns segundos.');
+  for (let i = 0; i < candidates.length; i++) {
+    const candidate = candidates[i];
+    let url = `${BASE_URL}${candidate}`;
+
+    if (params) {
+      const searchParams = new URLSearchParams(params);
+      url += `?${searchParams.toString()}`;
     }
-    throw new Error('Erro de conexão. Verifique sua internet ou tente novamente.');
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      response = await fetch(url, {
+        ...rest,
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(validToken ? { Authorization: `Bearer ${validToken}` } : {}),
+          ...headers,
+        },
+      });
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error('O servidor demorou para responder. O backend pode estar iniciando — tente novamente em alguns segundos.');
+      }
+      throw new Error('Erro de conexão. Verifique sua internet ou tente novamente.');
+    }
+
+    clearTimeout(timeoutId);
+
+    const isLastCandidate = i === candidates.length - 1;
+    if (response.status === 404 && !isLastCandidate) {
+      continue;
+    }
+
+    break;
   }
-  clearTimeout(timeoutId);
+
+  if (!response) {
+    throw new Error('Erro inesperado ao processar a requisição.');
+  }
 
   if (!response.ok) {
     if (response.status === 401) {
