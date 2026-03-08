@@ -102,20 +102,29 @@ export default function CheckoutPage() {
     }
   };
 
-  // Step 1: Create order in backend, Step 2: Generate payment with orderId
-  const createOrder = async (): Promise<string> => {
+  // Step 1 (preferencial): criar pedido no backend; fallback para pagamento direto se rota não existir
+  const createOrder = async (): Promise<string | null> => {
     const savedAddress = getSavedAddress();
-    const orderRes = await api.post<any>('/api/checkout/create-order', {
-      items: items.map((i) => ({
-        productId: i.product.id,
-        quantity: i.quantity,
-      })),
-      shippingAddress: savedAddress || undefined,
-      couponCode: savedCoupon?.code || undefined,
-    });
-    const orderId = orderRes?.data?._id || orderRes?._id || orderRes?.id;
-    if (!orderId) throw new Error('Pedido criado mas ID não retornado pelo servidor.');
-    return orderId;
+
+    try {
+      const orderRes = await api.post<any>('/api/checkout/create-order', {
+        items: items.map((i) => ({
+          productId: i.product.id,
+          quantity: i.quantity,
+        })),
+        shippingAddress: savedAddress || undefined,
+        couponCode: savedCoupon?.code || undefined,
+      });
+
+      const orderId = orderRes?.data?._id || orderRes?._id || orderRes?.id;
+      return orderId || null;
+    } catch (err: any) {
+      if (String(err?.message || '').includes('Sessão expirada')) {
+        throw err;
+      }
+      console.warn('create-order indisponível, usando fallback de pagamento direto:', err?.message || err);
+      return null;
+    }
   };
 
   const handlePayPix = async () => {
