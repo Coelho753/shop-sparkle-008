@@ -47,6 +47,11 @@ export default function CheckoutPage() {
   const [pixData, setPixData] = useState<PixData | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; type: string; value: number; discount: number } | null>(null);
+
   // Card fields
   const [cardNumber, setCardNumber] = useState('');
   const [cardHolder, setCardHolder] = useState('');
@@ -57,7 +62,9 @@ export default function CheckoutPage() {
   const [email, setEmail] = useState(user?.email || '');
 
   const shippingCost = parseFloat(sessionStorage.getItem('dsg-shipping-cost') || '0');
-  const total = totalPrice + shippingCost;
+  const subtotal = totalPrice + shippingCost;
+  const discount = appliedCoupon?.discount || 0;
+  const total = Math.max(0, subtotal - discount);
 
   const saveOrderLocally = (paymentMethod: 'pix' | 'card') => {
     // Save locally for immediate display (backend creates the order inside createPayment)
