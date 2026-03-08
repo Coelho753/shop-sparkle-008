@@ -103,14 +103,25 @@ export default function CheckoutPage() {
       }
     })();
 
-    const orderRes = await api.post<any>('/api/checkout/create-order', {
+    const orderPayload = {
       items: items.map((i) => ({
         productId: i.product.id,
         quantity: i.quantity,
       })),
       shippingAddress: savedAddress || undefined,
       couponCode: savedCoupon?.code || undefined,
-    });
+    };
+
+    let orderRes: any;
+    try {
+      orderRes = await api.post<any>('/api/checkout/create-order', orderPayload);
+    } catch (err: any) {
+      const isNotFound = String(err?.message || '').includes('404');
+      if (!isNotFound) throw err;
+      orderRes = await api.post<any>('/api/orders', {
+        items: orderPayload.items,
+      });
+    }
 
     const orderId = orderRes.orderId || orderRes.data?.orderId || orderRes._id || orderRes.id;
     if (!orderId) throw new Error('Não foi possível criar o pedido.');
@@ -129,6 +140,7 @@ export default function CheckoutPage() {
         orderId,
         amount: total,
         payment_method_id: 'pix',
+        couponCode: savedCoupon?.code || undefined,
         description: `Pedido DSG - ${items.length} item(ns)`,
         email: email || user?.email || '',
         payer: {
@@ -138,6 +150,11 @@ export default function CheckoutPage() {
             number: user?.cpf?.replace(/\D/g, '') || '',
           },
         },
+        items: items.map((i) => ({
+          title: i.product.name,
+          quantity: i.quantity,
+          unit_price: Number(i.product.price),
+        })),
       });
 
       if (res.qr_code_base64 || res.qr_code) {
@@ -187,6 +204,7 @@ export default function CheckoutPage() {
         amount: total,
         token: cardToken.id,
         payment_method_id: 'visa',
+        couponCode: savedCoupon?.code || undefined,
         description: `Pedido DSG - ${items.length} item(ns)`,
         installments: parseInt(installments),
         email: email || user?.email || '',
@@ -197,6 +215,11 @@ export default function CheckoutPage() {
             number: user?.cpf?.replace(/\D/g, '') || '',
           },
         },
+        items: items.map((i) => ({
+          title: i.product.name,
+          quantity: i.quantity,
+          unit_price: Number(i.product.price),
+        })),
       });
 
       if (res.status === 'approved') {
