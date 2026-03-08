@@ -93,39 +93,13 @@ export default function CheckoutPage() {
     };
   }, []);
 
-  const createOrder = async () => {
-    const savedAddress = (() => {
-      try {
-        const a = sessionStorage.getItem('dsg-address');
-        return a ? JSON.parse(a) : null;
-      } catch {
-        return null;
-      }
-    })();
-
-    const orderPayload = {
-      items: items.map((i) => ({
-        productId: i.product.id,
-        quantity: i.quantity,
-      })),
-      shippingAddress: savedAddress || undefined,
-      couponCode: savedCoupon?.code || undefined,
-    };
-
-    let orderRes: any;
+  const getSavedAddress = () => {
     try {
-      orderRes = await api.post<any>('/api/checkout/create-order', orderPayload);
-    } catch (err: any) {
-      const isNotFound = String(err?.message || '').includes('404');
-      if (!isNotFound) throw err;
-      orderRes = await api.post<any>('/api/orders', {
-        items: orderPayload.items,
-      });
+      const a = sessionStorage.getItem('dsg-address');
+      return a ? JSON.parse(a) : null;
+    } catch {
+      return null;
     }
-
-    const orderId = orderRes.orderId || orderRes.data?.orderId || orderRes._id || orderRes.id;
-    if (!orderId) throw new Error('Não foi possível criar o pedido.');
-    return orderId;
   };
 
   const handlePayPix = async () => {
