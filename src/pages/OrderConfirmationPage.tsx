@@ -34,15 +34,16 @@ export default function OrderConfirmationPage() {
     discount: number;
   } | null>(null);
 
-  // Address from user profile or manual
+  // Address pre-filled from user profile
+  const userAddr = user?.address;
   const [address, setAddress] = useState({
-    street: user?.address?.street || '',
-    number: user?.address?.number || '',
-    neighborhood: user?.address?.neighborhood || '',
-    city: user?.address?.city || '',
-    state: user?.address?.state || '',
-    zipCode: user?.address?.zipCode || '',
-    complement: user?.address?.complement || '',
+    street: userAddr?.street || '',
+    number: userAddr?.number || '',
+    neighborhood: userAddr?.neighborhood || '',
+    city: userAddr?.city || '',
+    state: userAddr?.state || '',
+    zipCode: userAddr?.zipCode || '',
+    complement: userAddr?.complement || '',
   });
 
   const shippingCost = parseFloat(sessionStorage.getItem('dsg-shipping-cost') || '0');
