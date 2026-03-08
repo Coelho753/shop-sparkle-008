@@ -212,6 +212,36 @@ export default function CheckoutPage() {
     }
   };
 
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponLoading(true);
+    try {
+      const res = await api.post<any>('/api/coupons/validate', {
+        code: couponCode.trim().toUpperCase(),
+        orderTotal: totalPrice,
+      });
+      const discountValue = res.type === 'percentage'
+        ? Math.min((totalPrice * res.value) / 100, res.maxDiscount || Infinity)
+        : Math.min(res.value, totalPrice);
+      setAppliedCoupon({
+        code: res.code || couponCode.trim().toUpperCase(),
+        type: res.type,
+        value: res.value,
+        discount: discountValue,
+      });
+      toast({ title: 'Cupom aplicado! 🎉', description: `Desconto de R$ ${discountValue.toFixed(2).replace('.', ',')}` });
+    } catch (err: any) {
+      toast({ title: 'Cupom inválido', description: err.message || 'Verifique o código e tente novamente.', variant: 'destructive' });
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+  };
+
   const formatCardNumber = (v: string) => {
     const digits = v.replace(/\D/g, '').slice(0, 16);
     return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
