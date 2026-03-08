@@ -56,7 +56,9 @@ const AppRoutes = () => (
       <Route path="/products/:id" element={<ProductDetailPage />} />
       <Route path="/products" element={<ProductsPage />} />
       <Route path="/cart" element={<CartPage />} />
+      <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
       <Route path="/checkout" element={<CheckoutPage />} />
+      <Route path="/pix-payment" element={<PixPaymentPage />} />
       <Route path="/my-orders" element={<MyOrdersPage />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/admin/add-product" element={<AddProductPage />} />
