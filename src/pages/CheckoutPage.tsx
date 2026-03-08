@@ -19,6 +19,8 @@ import {
   QrCode,
   Copy,
   Check,
+  Tag,
+  X,
 } from 'lucide-react';
 
 const MP_PUBLIC_KEY = 'APP_USR-dd9fe952-6a20-45a2-b191-ae638329008a';
@@ -45,6 +47,11 @@ export default function CheckoutPage() {
   const [pixData, setPixData] = useState<PixData | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; type: string; value: number; discount: number } | null>(null);
+
   // Card fields
   const [cardNumber, setCardNumber] = useState('');
   const [cardHolder, setCardHolder] = useState('');
@@ -55,7 +62,9 @@ export default function CheckoutPage() {
   const [email, setEmail] = useState(user?.email || '');
 
   const shippingCost = parseFloat(sessionStorage.getItem('dsg-shipping-cost') || '0');
-  const total = totalPrice + shippingCost;
+  const subtotal = totalPrice + shippingCost;
+  const discount = appliedCoupon?.discount || 0;
+  const total = Math.max(0, subtotal - discount);
 
   const saveOrderLocally = (paymentMethod: 'pix' | 'card') => {
     // Save locally for immediate display (backend creates the order inside createPayment)
@@ -100,6 +109,7 @@ export default function CheckoutPage() {
       const res = await api.post<any>('/api/payments/create', {
         amount: total,
         payment_method_id: 'pix',
+        couponCode: appliedCoupon?.code || undefined,
         description: `Pedido DSG - ${items.length} item(ns)`,
         email: email || user?.email || '',
         payer: {
@@ -156,6 +166,7 @@ export default function CheckoutPage() {
         amount: total,
         token: cardToken.id,
         payment_method_id: 'visa',
+        couponCode: appliedCoupon?.code || undefined,
         description: `Pedido DSG - ${items.length} item(ns)`,
         installments: parseInt(installments),
         email: email || user?.email || '',
@@ -201,6 +212,36 @@ export default function CheckoutPage() {
       setTimeout(() => setCopied(false), 2000);
       toast({ title: 'Código copiado!' });
     }
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponLoading(true);
+    try {
+      const res = await api.post<any>('/api/coupons/validate', {
+        code: couponCode.trim().toUpperCase(),
+        orderTotal: totalPrice,
+      });
+      const discountValue = res.type === 'percentage'
+        ? Math.min((totalPrice * res.value) / 100, res.maxDiscount || Infinity)
+        : Math.min(res.value, totalPrice);
+      setAppliedCoupon({
+        code: res.code || couponCode.trim().toUpperCase(),
+        type: res.type,
+        value: res.value,
+        discount: discountValue,
+      });
+      toast({ title: 'Cupom aplicado! 🎉', description: `Desconto de R$ ${discountValue.toFixed(2).replace('.', ',')}` });
+    } catch (err: any) {
+      toast({ title: 'Cupom inválido', description: err.message || 'Verifique o código e tente novamente.', variant: 'destructive' });
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
   };
 
   const formatCardNumber = (v: string) => {
@@ -419,6 +460,40 @@ export default function CheckoutPage() {
         )}
       </div>
 
+      {/* Coupon */}
+      <div className="p-5 rounded-xl bg-card border border-border space-y-3">
+        <div className="flex items-center gap-2 text-foreground font-semibold text-sm">
+          <Tag className="w-4 h-4 text-primary" />
+          Cupom de desconto
+        </div>
+        {appliedCoupon ? (
+          <div className="flex items-center justify-between p-3 rounded-lg bg-primary/10 border border-primary/20">
+            <div>
+              <span className="font-mono font-semibold text-sm text-foreground">{appliedCoupon.code}</span>
+              <span className="text-xs text-muted-foreground ml-2">
+                -R$ {appliedCoupon.discount.toFixed(2).replace('.', ',')}
+              </span>
+            </div>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={removeCoupon}>
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <Input
+              placeholder="CÓDIGO"
+              value={couponCode}
+              onChange={e => setCouponCode(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
+              className="font-mono uppercase"
+            />
+            <Button variant="outline" onClick={handleApplyCoupon} disabled={couponLoading || !couponCode.trim()}>
+              {couponLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Aplicar'}
+            </Button>
+          </div>
+        )}
+      </div>
+
       {/* Totals + Pay */}
       <div className="p-6 rounded-xl bg-card border border-border space-y-3">
         <div className="flex justify-between text-sm text-muted-foreground">
@@ -429,6 +504,12 @@ export default function CheckoutPage() {
           <div className="flex justify-between text-sm text-muted-foreground">
             <span>Frete</span>
             <span>R$ {shippingCost.toFixed(2).replace('.', ',')}</span>
+          </div>
+        )}
+        {appliedCoupon && (
+          <div className="flex justify-between text-sm text-green-500">
+            <span>Cupom ({appliedCoupon.code})</span>
+            <span>-R$ {appliedCoupon.discount.toFixed(2).replace('.', ',')}</span>
           </div>
         )}
         <div className="border-t border-border pt-3 flex justify-between items-baseline">

@@ -9,8 +9,11 @@ export interface CartItem {
 }
 
 interface ApiCartItem {
-  productId: string | { _id: string; nome?: string; name?: string; preco?: number; price?: number; images?: string[]; imagens?: string[]; imageUrl?: string; descricao?: string; description?: string; estoque?: number; stock?: number; categoria?: any; category?: any; avaliacaoMedia?: number; rating?: number; totalAvaliacoes?: number; reviewCount?: number; ativo?: boolean; active?: boolean; promocao?: any; hasPromo?: boolean; promoLabel?: string; precoOriginal?: number; originalPrice?: number };
+  product: string | { _id: string; nome?: string; name?: string; preco?: number; price?: number; images?: string[]; imagens?: string[]; imageUrl?: string; descricao?: string; description?: string; estoque?: number; stock?: number; categoria?: any; category?: any; avaliacaoMedia?: number; rating?: number; totalAvaliacoes?: number; reviewCount?: number; ativo?: boolean; active?: boolean; promocao?: any; hasPromo?: boolean; promoLabel?: string; precoOriginal?: number; originalPrice?: number };
+  name?: string;
+  price?: number;
   quantity: number;
+  selected?: boolean;
 }
 
 interface CartContextType {
@@ -30,9 +33,9 @@ const BASE_URL = 'https://dsg-b.onrender.com';
 
 function mapApiCartToItems(apiItems: ApiCartItem[]): CartItem[] {
   return apiItems
-    .filter(item => item.productId && typeof item.productId === 'object')
+    .filter(item => item.product && typeof item.product === 'object')
     .map(item => {
-      const p = item.productId as any;
+      const p = item.product as any;
       const rawPrice = p.price ?? p.preco ?? 0;
       const price = rawPrice > 1000 ? rawPrice / 100 : rawPrice;
       const rawOriginal = p.originalPrice ?? p.precoOriginal;
@@ -126,13 +129,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(getCartKey(user?.id), JSON.stringify(items));
   }, [items, user?.id]);
 
-  // Sync to server silently
-  const syncToServer = useCallback(async (productId: string, quantity: number) => {
+  // Add item via POST /api/cart
+  const addToServer = useCallback(async (productId: string, quantity: number) => {
     if (!user) return;
     try {
       await api.post('/api/cart', { productId, quantity });
     } catch {
       // Silently fail - local cart is source of truth
+    }
+  }, [user]);
+
+  // Update quantity via PUT /api/cart/quantity
+  const updateOnServer = useCallback(async (productId: string, quantity: number) => {
+    if (!user) return;
+    try {
+      await api.put('/api/cart/quantity', { productId, quantity });
+    } catch {
+      // Silently fail
     }
   }, [user]);
 
@@ -145,21 +158,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  const clearOnServer = useCallback(async () => {
+    if (!user) return;
+    try {
+      await api.delete('/api/cart/clear/all');
+    } catch {
+      // Silently fail
+    }
+  }, [user]);
+
   const addItem = useCallback((product: Product, quantity = 1) => {
     setItems(prev => {
       const existing = prev.find(i => i.product.id === product.id);
-      const newQty = existing ? existing.quantity + quantity : quantity;
-      syncToServer(product.id, newQty);
       if (existing) {
+        const newQty = existing.quantity + quantity;
+        updateOnServer(product.id, newQty);
         return prev.map(i =>
-          i.product.id === product.id
-            ? { ...i, quantity: newQty }
-            : i
+          i.product.id === product.id ? { ...i, quantity: newQty } : i
         );
       }
+      addToServer(product.id, quantity);
       return [...prev, { product, quantity }];
     });
-  }, [syncToServer]);
+  }, [addToServer, updateOnServer]);
 
   const removeItem = useCallback((productId: string) => {
     setItems(prev => prev.filter(i => i.product.id !== productId));
@@ -175,14 +196,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems(prev =>
       prev.map(i => (i.product.id === productId ? { ...i, quantity } : i))
     );
-    syncToServer(productId, quantity);
-  }, [syncToServer, removeFromServer]);
+    updateOnServer(productId, quantity);
+  }, [updateOnServer, removeFromServer]);
 
   const clearCart = useCallback(() => {
-    // Remove each item from server
-    items.forEach(i => removeFromServer(i.product.id));
     setItems([]);
-  }, [items, removeFromServer]);
+    clearOnServer();
+  }, [clearOnServer]);
 
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const totalPrice = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
