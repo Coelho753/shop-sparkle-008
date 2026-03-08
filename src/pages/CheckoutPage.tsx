@@ -93,14 +93,42 @@ export default function CheckoutPage() {
     };
   }, []);
 
+  const createOrder = async () => {
+    const savedAddress = (() => {
+      try {
+        const a = sessionStorage.getItem('dsg-address');
+        return a ? JSON.parse(a) : null;
+      } catch {
+        return null;
+      }
+    })();
+
+    const orderRes = await api.post<any>('/api/checkout/create-order', {
+      items: items.map((i) => ({
+        productId: i.product.id,
+        quantity: i.quantity,
+      })),
+      shippingAddress: savedAddress || undefined,
+      couponCode: savedCoupon?.code || undefined,
+    });
+
+    const orderId = orderRes.orderId || orderRes.data?.orderId || orderRes._id || orderRes.id;
+    if (!orderId) throw new Error('Não foi possível criar o pedido.');
+    return orderId;
+  };
+
   const handlePayPix = async () => {
     if (items.length === 0) return;
     setLoading(true);
     try {
+      // Step 1: Create order
+      const orderId = await createOrder();
+
+      // Step 2: Create payment with orderId
       const res = await api.post<any>('/api/payments/create', {
+        orderId,
         amount: total,
         payment_method_id: 'pix',
-        couponCode: savedCoupon?.code || undefined,
         description: `Pedido DSG - ${items.length} item(ns)`,
         email: email || user?.email || '',
         payer: {
@@ -110,11 +138,6 @@ export default function CheckoutPage() {
             number: user?.cpf?.replace(/\D/g, '') || '',
           },
         },
-        items: items.map((i) => ({
-          title: i.product.name,
-          quantity: i.quantity,
-          unit_price: Number(i.product.price),
-        })),
       });
 
       if (res.qr_code_base64 || res.qr_code) {
@@ -155,11 +178,15 @@ export default function CheckoutPage() {
         securityCode: cvv,
       });
 
+      // Step 1: Create order
+      const orderId = await createOrder();
+
+      // Step 2: Create payment with orderId
       const res = await api.post<any>('/api/payments/create', {
+        orderId,
         amount: total,
         token: cardToken.id,
         payment_method_id: 'visa',
-        couponCode: savedCoupon?.code || undefined,
         description: `Pedido DSG - ${items.length} item(ns)`,
         installments: parseInt(installments),
         email: email || user?.email || '',
@@ -170,11 +197,6 @@ export default function CheckoutPage() {
             number: user?.cpf?.replace(/\D/g, '') || '',
           },
         },
-        items: items.map((i) => ({
-          title: i.product.name,
-          quantity: i.quantity,
-          unit_price: Number(i.product.price),
-        })),
       });
 
       if (res.status === 'approved') {
