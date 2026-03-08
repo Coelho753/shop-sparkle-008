@@ -168,12 +168,9 @@ export default function CheckoutPage() {
         securityCode: cvv,
       });
 
-      // Step 1: Create order
-      const orderId = await createOrder();
+      const savedAddress = getSavedAddress();
 
-      // Step 2: Create payment with orderId
       const res = await api.post<any>('/api/payments/create', {
-        orderId,
         amount: total,
         token: cardToken.id,
         payment_method_id: 'visa',
@@ -181,6 +178,7 @@ export default function CheckoutPage() {
         description: `Pedido DSG - ${items.length} item(ns)`,
         installments: parseInt(installments),
         email: email || user?.email || '',
+        shippingAddress: savedAddress || undefined,
         payer: {
           email: email || user?.email || '',
           identification: {
@@ -189,6 +187,7 @@ export default function CheckoutPage() {
           },
         },
         items: items.map((i) => ({
+          productId: i.product.id,
           title: i.product.name,
           quantity: i.quantity,
           unit_price: Number(i.product.price),
