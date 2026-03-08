@@ -458,6 +458,40 @@ export default function CheckoutPage() {
         )}
       </div>
 
+      {/* Coupon */}
+      <div className="p-5 rounded-xl bg-card border border-border space-y-3">
+        <div className="flex items-center gap-2 text-foreground font-semibold text-sm">
+          <Tag className="w-4 h-4 text-primary" />
+          Cupom de desconto
+        </div>
+        {appliedCoupon ? (
+          <div className="flex items-center justify-between p-3 rounded-lg bg-primary/10 border border-primary/20">
+            <div>
+              <span className="font-mono font-semibold text-sm text-foreground">{appliedCoupon.code}</span>
+              <span className="text-xs text-muted-foreground ml-2">
+                -R$ {appliedCoupon.discount.toFixed(2).replace('.', ',')}
+              </span>
+            </div>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={removeCoupon}>
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <Input
+              placeholder="CÓDIGO"
+              value={couponCode}
+              onChange={e => setCouponCode(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
+              className="font-mono uppercase"
+            />
+            <Button variant="outline" onClick={handleApplyCoupon} disabled={couponLoading || !couponCode.trim()}>
+              {couponLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Aplicar'}
+            </Button>
+          </div>
+        )}
+      </div>
+
       {/* Totals + Pay */}
       <div className="p-6 rounded-xl bg-card border border-border space-y-3">
         <div className="flex justify-between text-sm text-muted-foreground">
@@ -468,6 +502,12 @@ export default function CheckoutPage() {
           <div className="flex justify-between text-sm text-muted-foreground">
             <span>Frete</span>
             <span>R$ {shippingCost.toFixed(2).replace('.', ',')}</span>
+          </div>
+        )}
+        {appliedCoupon && (
+          <div className="flex justify-between text-sm text-green-500">
+            <span>Cupom ({appliedCoupon.code})</span>
+            <span>-R$ {appliedCoupon.discount.toFixed(2).replace('.', ',')}</span>
           </div>
         )}
         <div className="border-t border-border pt-3 flex justify-between items-baseline">
