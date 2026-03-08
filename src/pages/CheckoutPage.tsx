@@ -201,6 +201,7 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       const orderId = await createOrder();
+      const savedAddress = getSavedAddress();
 
       const mp = (window as any).mpInstance;
       const cardToken = await mp.createCardToken({
@@ -211,20 +212,46 @@ export default function CheckoutPage() {
         securityCode: cvv,
       });
 
-      const res = await api.post<any>('/api/payments/create', {
-        orderId,
-        token: cardToken.id,
-        payment_method_id: 'visa',
-        installments: parseInt(installments),
-        email: email || user?.email || '',
-        payer: {
-          email: email || user?.email || '',
-          identification: {
-            type: 'CPF',
-            number: user?.cpf?.replace(/\D/g, '') || '',
-          },
-        },
-      });
+      const res = await api.post<any>('/api/payments/create',
+        orderId
+          ? {
+              orderId,
+              token: cardToken.id,
+              payment_method_id: 'visa',
+              installments: parseInt(installments),
+              email: email || user?.email || '',
+              payer: {
+                email: email || user?.email || '',
+                identification: {
+                  type: 'CPF',
+                  number: user?.cpf?.replace(/\D/g, '') || '',
+                },
+              },
+            }
+          : {
+              amount: total,
+              token: cardToken.id,
+              payment_method_id: 'visa',
+              installments: parseInt(installments),
+              description: 'Pedido DSG',
+              email: email || user?.email || '',
+              shippingAddress: savedAddress || undefined,
+              couponCode: savedCoupon?.code || undefined,
+              payer: {
+                email: email || user?.email || '',
+                identification: {
+                  type: 'CPF',
+                  number: user?.cpf?.replace(/\D/g, '') || '',
+                },
+              },
+              items: items.map((i) => ({
+                title: i.product.name,
+                quantity: i.quantity,
+                unit_price: i.product.price,
+                currency_id: 'BRL',
+              })),
+            }
+      );
 
       if (res.status === 'approved') {
         saveOrderLocally('card');
