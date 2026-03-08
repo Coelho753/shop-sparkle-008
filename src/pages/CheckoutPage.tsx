@@ -19,6 +19,8 @@ import {
   QrCode,
   Copy,
   Check,
+  Tag,
+  X,
 } from 'lucide-react';
 
 const MP_PUBLIC_KEY = 'APP_USR-dd9fe952-6a20-45a2-b191-ae638329008a';
