@@ -102,7 +102,21 @@ export default function CheckoutPage() {
     }
   };
 
-  // Step 1 (preferencial): criar pedido no backend; fallback para pagamento direto se rota não existir
+  // Step 1 (obrigatório): criar pedido no backend e obter orderId
+  const extractOrderId = (payload: any): string | null => {
+    return (
+      payload?.data?._id ||
+      payload?.data?.id ||
+      payload?.data?.order?._id ||
+      payload?.data?.order?.id ||
+      payload?.order?._id ||
+      payload?.order?.id ||
+      payload?._id ||
+      payload?.id ||
+      null
+    );
+  };
+
   const createOrder = async (): Promise<string | null> => {
     const savedAddress = getSavedAddress();
 
@@ -116,13 +130,13 @@ export default function CheckoutPage() {
         couponCode: savedCoupon?.code || undefined,
       });
 
-      const orderId = orderRes?.data?._id || orderRes?._id || orderRes?.id;
-      return orderId || null;
+      const orderId = extractOrderId(orderRes);
+      return orderId;
     } catch (err: any) {
       if (String(err?.message || '').includes('Sessão expirada')) {
         throw err;
       }
-      console.warn('create-order indisponível, usando fallback de pagamento direto:', err?.message || err);
+      console.warn('Falha ao criar pedido:', err?.message || err);
       return null;
     }
   };
