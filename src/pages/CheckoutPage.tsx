@@ -102,20 +102,29 @@ export default function CheckoutPage() {
     }
   };
 
-  // Step 1: Create order in backend, Step 2: Generate payment with orderId
-  const createOrder = async (): Promise<string> => {
+  // Step 1 (preferencial): criar pedido no backend; fallback para pagamento direto se rota não existir
+  const createOrder = async (): Promise<string | null> => {
     const savedAddress = getSavedAddress();
-    const orderRes = await api.post<any>('/api/checkout/create-order', {
-      items: items.map((i) => ({
-        productId: i.product.id,
-        quantity: i.quantity,
-      })),
-      shippingAddress: savedAddress || undefined,
-      couponCode: savedCoupon?.code || undefined,
-    });
-    const orderId = orderRes?.data?._id || orderRes?._id || orderRes?.id;
-    if (!orderId) throw new Error('Pedido criado mas ID não retornado pelo servidor.');
-    return orderId;
+
+    try {
+      const orderRes = await api.post<any>('/api/checkout/create-order', {
+        items: items.map((i) => ({
+          productId: i.product.id,
+          quantity: i.quantity,
+        })),
+        shippingAddress: savedAddress || undefined,
+        couponCode: savedCoupon?.code || undefined,
+      });
+
+      const orderId = orderRes?.data?._id || orderRes?._id || orderRes?.id;
+      return orderId || null;
+    } catch (err: any) {
+      if (String(err?.message || '').includes('Sessão expirada')) {
+        throw err;
+      }
+      console.warn('create-order indisponível, usando fallback de pagamento direto:', err?.message || err);
+      return null;
+    }
   };
 
   const handlePayPix = async () => {
@@ -123,19 +132,44 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       const orderId = await createOrder();
+      const savedAddress = getSavedAddress();
 
-      const res = await api.post<any>('/api/payments/create', {
-        orderId,
-        payment_method_id: 'pix',
-        email: email || user?.email || '',
-        payer: {
-          email: email || user?.email || '',
-          identification: {
-            type: 'CPF',
-            number: user?.cpf?.replace(/\D/g, '') || '',
-          },
-        },
-      });
+      const res = await api.post<any>('/api/payments/create',
+        orderId
+          ? {
+              orderId,
+              payment_method_id: 'pix',
+              email: email || user?.email || '',
+              payer: {
+                email: email || user?.email || '',
+                identification: {
+                  type: 'CPF',
+                  number: user?.cpf?.replace(/\D/g, '') || '',
+                },
+              },
+            }
+          : {
+              amount: total,
+              payment_method_id: 'pix',
+              description: 'Pedido DSG',
+              email: email || user?.email || '',
+              shippingAddress: savedAddress || undefined,
+              couponCode: savedCoupon?.code || undefined,
+              payer: {
+                email: email || user?.email || '',
+                identification: {
+                  type: 'CPF',
+                  number: user?.cpf?.replace(/\D/g, '') || '',
+                },
+              },
+              items: items.map((i) => ({
+                title: i.product.name,
+                quantity: i.quantity,
+                unit_price: i.product.price,
+                currency_id: 'BRL',
+              })),
+            }
+      );
 
       if (res.qr_code_base64 || res.qr_code || res.point_of_interaction) {
         saveOrderLocally('pix');
@@ -167,6 +201,7 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       const orderId = await createOrder();
+      const savedAddress = getSavedAddress();
 
       const mp = (window as any).mpInstance;
       const cardToken = await mp.createCardToken({
@@ -177,20 +212,46 @@ export default function CheckoutPage() {
         securityCode: cvv,
       });
 
-      const res = await api.post<any>('/api/payments/create', {
-        orderId,
-        token: cardToken.id,
-        payment_method_id: 'visa',
-        installments: parseInt(installments),
-        email: email || user?.email || '',
-        payer: {
-          email: email || user?.email || '',
-          identification: {
-            type: 'CPF',
-            number: user?.cpf?.replace(/\D/g, '') || '',
-          },
-        },
-      });
+      const res = await api.post<any>('/api/payments/create',
+        orderId
+          ? {
+              orderId,
+              token: cardToken.id,
+              payment_method_id: 'visa',
+              installments: parseInt(installments),
+              email: email || user?.email || '',
+              payer: {
+                email: email || user?.email || '',
+                identification: {
+                  type: 'CPF',
+                  number: user?.cpf?.replace(/\D/g, '') || '',
+                },
+              },
+            }
+          : {
+              amount: total,
+              token: cardToken.id,
+              payment_method_id: 'visa',
+              installments: parseInt(installments),
+              description: 'Pedido DSG',
+              email: email || user?.email || '',
+              shippingAddress: savedAddress || undefined,
+              couponCode: savedCoupon?.code || undefined,
+              payer: {
+                email: email || user?.email || '',
+                identification: {
+                  type: 'CPF',
+                  number: user?.cpf?.replace(/\D/g, '') || '',
+                },
+              },
+              items: items.map((i) => ({
+                title: i.product.name,
+                quantity: i.quantity,
+                unit_price: i.product.price,
+                currency_id: 'BRL',
+              })),
+            }
+      );
 
       if (res.status === 'approved') {
         saveOrderLocally('card');
