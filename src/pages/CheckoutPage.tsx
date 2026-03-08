@@ -93,56 +93,28 @@ export default function CheckoutPage() {
     };
   }, []);
 
-  const createOrder = async () => {
-    const savedAddress = (() => {
-      try {
-        const a = sessionStorage.getItem('dsg-address');
-        return a ? JSON.parse(a) : null;
-      } catch {
-        return null;
-      }
-    })();
-
-    const orderPayload = {
-      items: items.map((i) => ({
-        productId: i.product.id,
-        quantity: i.quantity,
-      })),
-      shippingAddress: savedAddress || undefined,
-      couponCode: savedCoupon?.code || undefined,
-    };
-
-    let orderRes: any;
+  const getSavedAddress = () => {
     try {
-      orderRes = await api.post<any>('/api/checkout/create-order', orderPayload);
-    } catch (err: any) {
-      const isNotFound = String(err?.message || '').includes('404');
-      if (!isNotFound) throw err;
-      orderRes = await api.post<any>('/api/orders', {
-        items: orderPayload.items,
-      });
+      const a = sessionStorage.getItem('dsg-address');
+      return a ? JSON.parse(a) : null;
+    } catch {
+      return null;
     }
-
-    const orderId = orderRes.orderId || orderRes.data?.orderId || orderRes._id || orderRes.id;
-    if (!orderId) throw new Error('Não foi possível criar o pedido.');
-    return orderId;
   };
 
   const handlePayPix = async () => {
     if (items.length === 0) return;
     setLoading(true);
     try {
-      // Step 1: Create order
-      const orderId = await createOrder();
+      const savedAddress = getSavedAddress();
 
-      // Step 2: Create payment with orderId
       const res = await api.post<any>('/api/payments/create', {
-        orderId,
         amount: total,
         payment_method_id: 'pix',
         couponCode: savedCoupon?.code || undefined,
         description: `Pedido DSG - ${items.length} item(ns)`,
         email: email || user?.email || '',
+        shippingAddress: savedAddress || undefined,
         payer: {
           email: email || user?.email || '',
           identification: {
@@ -151,6 +123,7 @@ export default function CheckoutPage() {
           },
         },
         items: items.map((i) => ({
+          productId: i.product.id,
           title: i.product.name,
           quantity: i.quantity,
           unit_price: Number(i.product.price),
@@ -195,12 +168,9 @@ export default function CheckoutPage() {
         securityCode: cvv,
       });
 
-      // Step 1: Create order
-      const orderId = await createOrder();
+      const savedAddress = getSavedAddress();
 
-      // Step 2: Create payment with orderId
       const res = await api.post<any>('/api/payments/create', {
-        orderId,
         amount: total,
         token: cardToken.id,
         payment_method_id: 'visa',
@@ -208,6 +178,7 @@ export default function CheckoutPage() {
         description: `Pedido DSG - ${items.length} item(ns)`,
         installments: parseInt(installments),
         email: email || user?.email || '',
+        shippingAddress: savedAddress || undefined,
         payer: {
           email: email || user?.email || '',
           identification: {
@@ -216,6 +187,7 @@ export default function CheckoutPage() {
           },
         },
         items: items.map((i) => ({
+          productId: i.product.id,
           title: i.product.name,
           quantity: i.quantity,
           unit_price: Number(i.product.price),
