@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,7 +6,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import api from '@/services/api';
 import { useLocalOrders } from '@/hooks/useLocalOrders';
 import {
@@ -14,41 +13,23 @@ import {
   ShieldCheck,
   Loader2,
   ShoppingCart,
-  CreditCard,
   QrCode,
   ChevronRight,
   AlertCircle,
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-const MP_PUBLIC_KEY = 'APP_USR-dd9fe952-6a20-45a2-b191-ae638329008a';
-
-type PaymentMethod = 'card' | 'pix';
-
 export default function CheckoutPage() {
-  const { items, clearCart, totalPrice } = useCart();
+  const { items, totalPrice } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { addOrder } = useLocalOrders();
 
   const [loading, setLoading] = useState(false);
-  const [mpReady, setMpReady] = useState(false);
-  const [method, setMethod] = useState<PaymentMethod>('pix');
-
-  // Debug logs
-  const [debugInfo, setDebugInfo] = useState<{ endpoint: string; orderId: string } | null>(null);
-
-  // Card fields
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardHolder, setCardHolder] = useState('');
-  const [expMonth, setExpMonth] = useState('');
-  const [expYear, setExpYear] = useState('');
-  const [cvv, setCvv] = useState('');
-  const [installments, setInstallments] = useState('1');
+  const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState(user?.email || '');
 
-  // Read saved data from confirmation page
   const shippingCost = parseFloat(sessionStorage.getItem('dsg-shipping-cost') || '0');
   const savedCoupon = (() => {
     try {
@@ -61,7 +42,7 @@ export default function CheckoutPage() {
   const discount = savedCoupon?.discount || 0;
   const total = Math.max(0, totalPrice + shippingCost - discount);
 
-  const saveOrderLocally = (paymentMethod: 'pix' | 'card') => {
+  const saveOrderLocally = () => {
     addOrder({
       items: items.map((i) => ({
         productId: i.product.id,
@@ -72,42 +53,11 @@ export default function CheckoutPage() {
       })),
       total,
       shippingCost,
-      paymentMethod,
+      paymentMethod: 'pix',
       createdAt: new Date().toISOString(),
     });
   };
 
-  // Load Mercado Pago SDK
-  useEffect(() => {
-    let cancelled = false;
-    const loadMP = async () => {
-      try {
-        const { loadMercadoPago } = await import('@mercadopago/sdk-js');
-        await loadMercadoPago();
-        if (!cancelled) {
-          (window as any).mpInstance = new (window as any).MercadoPago(MP_PUBLIC_KEY);
-          setMpReady(true);
-        }
-      } catch (err) {
-        console.error('Erro ao carregar SDK MercadoPago:', err);
-      }
-    };
-    loadMP();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const getSavedAddress = () => {
-    try {
-      const a = sessionStorage.getItem('dsg-address');
-      return a ? JSON.parse(a) : null;
-    } catch {
-      return null;
-    }
-  };
-
-  // Step 1 (obrigatório): criar pedido no backend e obter orderId
   const extractOrderId = (payload: any): string | null => {
     return (
       payload?.data?._id ||
@@ -141,36 +91,36 @@ export default function CheckoutPage() {
         });
 
         const orderId = extractOrderId(orderRes);
-        setDebugInfo({ endpoint, orderId: orderId || 'falha' });
-        console.log(`✓ Pedido criado: ${orderId} via ${endpoint}`);
+        console.log(`[Checkout] Endpoint ${endpoint} → orderId: ${orderId}`);
         if (orderId) return orderId;
       } catch (err: any) {
-        console.warn(`Falha ao criar pedido via ${endpoint}:`, err?.message || err);
-        if (String(err?.message || '').includes('Sessão expirada')) {
-          throw err;
-        }
+        console.warn(`[Checkout] Falha ${endpoint}:`, err?.message);
+        if (String(err?.message || '').includes('Sessão expirada')) throw err;
       }
     }
 
-    setDebugInfo({ endpoint: '/api/checkout/create-order', orderId: 'erro' });
     return null;
   };
 
   const handlePayPix = async () => {
     if (items.length === 0) return;
     setLoading(true);
+    setError(null);
+
     try {
       const orderId = await createOrder();
 
       if (!orderId) {
-        throw new Error('Não foi possível criar o pedido. Tente novamente em alguns segundos.');
+        throw new Error(
+          'Não foi possível criar o pedido. O backend pode estar iniciando — aguarde alguns segundos e tente novamente.'
+        );
       }
 
       const res = await api.post<any>('/api/payments/create', { orderId });
 
       const pixData = res?.data || res;
       if (pixData.qr_code_base64 || pixData.qr_code) {
-        saveOrderLocally('pix');
+        saveOrderLocally();
         navigate('/pix-payment', {
           state: {
             qr_code_base64: pixData.qr_code_base64,
@@ -179,80 +129,15 @@ export default function CheckoutPage() {
           },
         });
       } else {
-        toast({ title: 'Erro', description: 'Não foi possível gerar o PIX.', variant: 'destructive' });
+        throw new Error('O servidor não retornou dados do PIX (qr_code). Verifique o backend.');
       }
     } catch (err: any) {
-      console.error('Erro PIX:', err);
+      console.error('[Checkout] Erro PIX:', err);
+      setError(err.message || 'Erro desconhecido');
       toast({ title: 'Erro no PIX', description: err.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  };
-
-  const handlePayCard = async () => {
-    if (items.length === 0 || !mpReady) return;
-    setLoading(true);
-    try {
-      const orderId = await createOrder();
-
-      const mp = (window as any).mpInstance;
-      const cardToken = await mp.createCardToken({
-        cardNumber: cardNumber.replace(/\s/g, ''),
-        cardholderName: cardHolder,
-        cardExpirationMonth: expMonth,
-        cardExpirationYear: expYear,
-        securityCode: cvv,
-      });
-
-      if (!orderId) {
-        throw new Error('Não foi possível criar o pedido. Tente novamente em alguns segundos.');
-      }
-
-      const res = await api.post<any>('/api/payments/create', {
-        orderId,
-        token: cardToken.id,
-        payment_method_id: 'visa',
-        installments: parseInt(installments, 10),
-        email: email || user?.email || '',
-        payer: {
-          email: email || user?.email || '',
-          identification: {
-            type: 'CPF',
-            number: user?.cpf?.replace(/\D/g, '') || '',
-          },
-        },
-      });
-
-      if (res.status === 'approved') {
-        saveOrderLocally('card');
-        clearCart();
-        sessionStorage.removeItem('dsg-shipping-cost');
-        sessionStorage.removeItem('dsg-coupon');
-        sessionStorage.removeItem('dsg-address');
-        toast({ title: 'Pagamento aprovado! ✅', description: 'Seu pedido foi confirmado.' });
-        navigate('/my-orders');
-      } else if (res.status === 'in_process' || res.status === 'pending') {
-        saveOrderLocally('card');
-        toast({ title: 'Pagamento em análise', description: 'Seu pagamento está sendo processado.' });
-        navigate('/my-orders');
-      } else {
-        toast({
-          title: 'Pagamento recusado',
-          description: res.status_detail || 'Tente outro cartão.',
-          variant: 'destructive',
-        });
-      }
-    } catch (err: any) {
-      console.error('Erro cartão:', err);
-      toast({ title: 'Erro no pagamento', description: err.message, variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatCardNumber = (v: string) => {
-    const digits = v.replace(/\D/g, '').slice(0, 16);
-    return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
   };
 
   if (items.length === 0) {
@@ -280,55 +165,32 @@ export default function CheckoutPage() {
         <ChevronRight className="w-3 h-3" />
         <span>Confirmação</span>
         <ChevronRight className="w-3 h-3" />
-        <span className="text-primary font-semibold">Pagamento</span>
+        <span className="text-primary font-semibold">Pagamento PIX</span>
       </div>
-
-      {/* Debug Info */}
-      {debugInfo && (
-        <Alert variant="default" className="border-amber-500/50 bg-amber-500/10">
-          <AlertCircle className="h-4 w-4 text-amber-600" />
-          <AlertTitle className="text-amber-900">Informações de Debug</AlertTitle>
-          <AlertDescription className="text-amber-800 space-y-1">
-            <div><strong>Endpoint:</strong> {debugInfo.endpoint}</div>
-            <div><strong>Order ID:</strong> {debugInfo.orderId}</div>
-          </AlertDescription>
-        </Alert>
-      )}
 
       <div className="flex items-center gap-3">
         <ShieldCheck className="w-6 h-6 text-primary" />
-        <h1 className="text-2xl font-display font-bold text-foreground">Pagamento</h1>
+        <h1 className="text-2xl font-display font-bold text-foreground">Pagamento via PIX</h1>
       </div>
 
-      {/* Payment method selector */}
+      {/* Error display */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erro</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Email + PIX info */}
       <div className="p-6 rounded-xl bg-card border border-border space-y-4">
-        <h2 className="font-display font-semibold text-foreground">Forma de pagamento</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => setMethod('pix')}
-            className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-all text-sm font-medium ${
-              method === 'pix'
-                ? 'border-primary bg-primary/10 text-foreground'
-                : 'border-border text-muted-foreground hover:border-primary/40'
-            }`}
-          >
-            <QrCode className="w-5 h-5" /> PIX
-          </button>
-          <button
-            onClick={() => setMethod('card')}
-            className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-all text-sm font-medium ${
-              method === 'card'
-                ? 'border-primary bg-primary/10 text-foreground'
-                : 'border-border text-muted-foreground hover:border-primary/40'
-            }`}
-          >
-            <CreditCard className="w-5 h-5" /> Cartão
-          </button>
+        <div className="flex items-center gap-3">
+          <QrCode className="w-5 h-5 text-primary" />
+          <h2 className="font-display font-semibold text-foreground">Pagar com PIX</h2>
         </div>
 
-        {/* Email */}
         <div className="space-y-2">
-          <Label htmlFor="email">E-mail</Label>
+          <Label htmlFor="email">E-mail para recibo</Label>
           <Input
             id="email"
             type="email"
@@ -338,101 +200,9 @@ export default function CheckoutPage() {
           />
         </div>
 
-        {/* Card form */}
-        {method === 'card' && (
-          <div className="space-y-3 pt-2">
-            <div className="space-y-2">
-              <Label>Número do cartão</Label>
-              <Input
-                placeholder="0000 0000 0000 0000"
-                value={cardNumber}
-                onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                maxLength={19}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Nome no cartão</Label>
-              <Input
-                placeholder="NOME COMPLETO"
-                value={cardHolder}
-                onChange={(e) => setCardHolder(e.target.value.toUpperCase())}
-              />
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-2">
-                <Label>Mês</Label>
-                <Select value={expMonth} onValueChange={setExpMonth}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="MM" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => {
-                      const m = String(i + 1).padStart(2, '0');
-                      return (
-                        <SelectItem key={m} value={m}>
-                          {m}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Ano</Label>
-                <Select value={expYear} onValueChange={setExpYear}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="AA" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 10 }, (_, i) => {
-                      const y = String(new Date().getFullYear() + i).slice(-2);
-                      return (
-                        <SelectItem key={y} value={y}>
-                          {y}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>CVV</Label>
-                <Input
-                  placeholder="123"
-                  value={cvv}
-                  onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                  maxLength={4}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Parcelas</Label>
-              <Select value={installments} onValueChange={setInstallments}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}x de R$ {(total / n).toFixed(2).replace('.', ',')}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {!mpReady && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Loader2 className="w-3 h-3 animate-spin" /> Carregando SDK de pagamento...
-              </p>
-            )}
-          </div>
-        )}
-
-        {method === 'pix' && (
-          <p className="text-sm text-muted-foreground">
-            Ao clicar em "Gerar PIX", um QR code será exibido para você pagar pelo app do seu banco.
-          </p>
-        )}
+        <p className="text-sm text-muted-foreground">
+          Ao clicar em "Gerar PIX", um QR code será exibido para você pagar pelo app do seu banco.
+        </p>
       </div>
 
       {/* Totals + Pay */}
@@ -462,17 +232,15 @@ export default function CheckoutPage() {
         <Button
           className="w-full"
           size="lg"
-          onClick={method === 'pix' ? handlePayPix : handlePayCard}
-          disabled={loading || (method === 'card' && !mpReady)}
+          onClick={handlePayPix}
+          disabled={loading}
         >
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin mr-2" /> Processando...
             </>
-          ) : method === 'pix' ? (
-            'Gerar PIX'
           ) : (
-            'Pagar com Cartão'
+            'Gerar PIX'
           )}
         </Button>
       </div>
