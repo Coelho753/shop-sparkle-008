@@ -132,8 +132,6 @@ export default function CheckoutPage() {
           productId: i.product.id,
           quantity: i.quantity,
         })),
-        shippingAddress: savedAddress || undefined,
-        couponCode: savedCoupon?.code || undefined,
       });
 
       const orderId = extractOrderId(orderRes);
