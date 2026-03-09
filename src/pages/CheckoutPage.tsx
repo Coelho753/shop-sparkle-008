@@ -124,9 +124,10 @@ export default function CheckoutPage() {
 
   const createOrder = async (): Promise<string | null> => {
     const savedAddress = getSavedAddress();
+    const endpoint = '/api/checkout/create-order';
 
     try {
-      const orderRes = await api.post<any>('/api/checkout/create-order', {
+      const orderRes = await api.post<any>(endpoint, {
         items: items.map((i) => ({
           productId: i.product.id,
           quantity: i.quantity,
@@ -136,8 +137,13 @@ export default function CheckoutPage() {
       });
 
       const orderId = extractOrderId(orderRes);
+      // Log debug info
+      setDebugInfo({ endpoint, orderId: orderId || 'falha' });
+      console.log(`✓ Pedido criado: ${orderId} via ${endpoint}`);
       return orderId;
     } catch (err: any) {
+      setDebugInfo({ endpoint, orderId: 'erro' });
+      console.error(`✗ Erro ao criar pedido via ${endpoint}:`, err);
       if (String(err?.message || '').includes('Sessão expirada')) {
         throw err;
       }
