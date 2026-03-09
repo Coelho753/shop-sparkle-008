@@ -17,7 +17,9 @@ import {
   CreditCard,
   QrCode,
   ChevronRight,
+  AlertCircle,
 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const MP_PUBLIC_KEY = 'APP_USR-dd9fe952-6a20-45a2-b191-ae638329008a';
 
@@ -33,6 +35,9 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [mpReady, setMpReady] = useState(false);
   const [method, setMethod] = useState<PaymentMethod>('pix');
+
+  // Debug logs
+  const [debugInfo, setDebugInfo] = useState<{ endpoint: string; orderId: string } | null>(null);
 
   // Card fields
   const [cardNumber, setCardNumber] = useState('');
@@ -119,9 +124,10 @@ export default function CheckoutPage() {
 
   const createOrder = async (): Promise<string | null> => {
     const savedAddress = getSavedAddress();
+    const endpoint = '/api/checkout/create-order';
 
     try {
-      const orderRes = await api.post<any>('/api/checkout/create-order', {
+      const orderRes = await api.post<any>(endpoint, {
         items: items.map((i) => ({
           productId: i.product.id,
           quantity: i.quantity,
@@ -131,8 +137,13 @@ export default function CheckoutPage() {
       });
 
       const orderId = extractOrderId(orderRes);
+      // Log debug info
+      setDebugInfo({ endpoint, orderId: orderId || 'falha' });
+      console.log(`✓ Pedido criado: ${orderId} via ${endpoint}`);
       return orderId;
     } catch (err: any) {
+      setDebugInfo({ endpoint, orderId: 'erro' });
+      console.error(`✗ Erro ao criar pedido via ${endpoint}:`, err);
       if (String(err?.message || '').includes('Sessão expirada')) {
         throw err;
       }
@@ -282,6 +293,18 @@ export default function CheckoutPage() {
         <ChevronRight className="w-3 h-3" />
         <span className="text-primary font-semibold">Pagamento</span>
       </div>
+
+      {/* Debug Info */}
+      {debugInfo && (
+        <Alert variant="default" className="border-amber-500/50 bg-amber-500/10">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-900">Informações de Debug</AlertTitle>
+          <AlertDescription className="text-amber-800 space-y-1">
+            <div><strong>Endpoint:</strong> {debugInfo.endpoint}</div>
+            <div><strong>Order ID:</strong> {debugInfo.orderId}</div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="flex items-center gap-3">
         <ShieldCheck className="w-6 h-6 text-primary" />
