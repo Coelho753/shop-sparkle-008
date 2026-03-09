@@ -36,6 +36,9 @@ export default function CheckoutPage() {
   const [mpReady, setMpReady] = useState(false);
   const [method, setMethod] = useState<PaymentMethod>('pix');
 
+  // Debug logs
+  const [debugInfo, setDebugInfo] = useState<{ endpoint: string; orderId: string } | null>(null);
+
   // Card fields
   const [cardNumber, setCardNumber] = useState('');
   const [cardHolder, setCardHolder] = useState('');
