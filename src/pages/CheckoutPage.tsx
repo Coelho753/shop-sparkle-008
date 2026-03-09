@@ -294,6 +294,18 @@ export default function CheckoutPage() {
         <span className="text-primary font-semibold">Pagamento</span>
       </div>
 
+      {/* Debug Info */}
+      {debugInfo && (
+        <Alert variant="default" className="border-amber-500/50 bg-amber-500/10">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-900">Informações de Debug</AlertTitle>
+          <AlertDescription className="text-amber-800 space-y-1">
+            <div><strong>Endpoint:</strong> {debugInfo.endpoint}</div>
+            <div><strong>Order ID:</strong> {debugInfo.orderId}</div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex items-center gap-3">
         <ShieldCheck className="w-6 h-6 text-primary" />
         <h1 className="text-2xl font-display font-bold text-foreground">Pagamento</h1>
