@@ -17,7 +17,9 @@ import {
   CreditCard,
   QrCode,
   ChevronRight,
+  AlertCircle,
 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const MP_PUBLIC_KEY = 'APP_USR-dd9fe952-6a20-45a2-b191-ae638329008a';
 
