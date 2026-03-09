@@ -132,8 +132,6 @@ export default function CheckoutPage() {
           productId: i.product.id,
           quantity: i.quantity,
         })),
-        shippingAddress: savedAddress || undefined,
-        couponCode: savedCoupon?.code || undefined,
       });
 
       const orderId = extractOrderId(orderRes);
@@ -162,33 +160,18 @@ export default function CheckoutPage() {
         throw new Error('Não foi possível criar o pedido. Tente novamente em alguns segundos.');
       }
 
-      const res = await api.post<any>('/api/payments/create', {
-        orderId,
-        payment_method_id: 'pix',
-        email: email || user?.email || '',
-        payer: {
-          email: email || user?.email || '',
-          identification: {
-            type: 'CPF',
-            number: user?.cpf?.replace(/\D/g, '') || '',
-          },
-        },
-      });
+      const res = await api.post<any>('/api/payments/create', { orderId });
 
-      if (res.qr_code_base64 || res.qr_code || res.point_of_interaction) {
+      const pixData = res?.data || res;
+      if (pixData.qr_code_base64 || pixData.qr_code) {
         saveOrderLocally('pix');
         navigate('/pix-payment', {
           state: {
-            qr_code_base64:
-              res.qr_code_base64 || res.point_of_interaction?.transaction_data?.qr_code_base64,
-            qr_code: res.qr_code || res.point_of_interaction?.transaction_data?.qr_code,
+            qr_code_base64: pixData.qr_code_base64,
+            qr_code: pixData.qr_code,
             total,
           },
         });
-      } else if (res.init_point || res.sandbox_init_point) {
-        saveOrderLocally('pix');
-        clearCart();
-        window.location.href = res.init_point || res.sandbox_init_point;
       } else {
         toast({ title: 'Erro', description: 'Não foi possível gerar o PIX.', variant: 'destructive' });
       }
